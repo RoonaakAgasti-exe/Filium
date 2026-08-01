@@ -1,0 +1,18 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.0
+pydantic[email]==2.9.2
+requests==2.32.3
+# Required by routers/query.py -> rag.py. The original requirements file
+# omitted this, so /query raised ModuleNotFoundError in the Docker image
+# even though it worked in a local dev shell that happened to have it.
+openai==1.54.0
+
+# Optional: cross-encoder reranking in rag.py. Left out of the image on
+# purpose — it pulls in torch (~800MB) for a precision improvement that
+# isn't needed to run the app. rag.rerank_chunks falls back to embedding
+# similarity order when it isn't installed.
+# sentence-transformers==3.2.1

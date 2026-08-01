@@ -1,0 +1,136 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fincopilot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      # schema.sql only runs on first container startup (empty data dir).
+      # Later schema changes go in db/migrations/ and must be applied by
+      # hand — see the "Upgrading an existing database" note in
+      # DEPLOYMENT.md. Mounted read-only so the container can't rewrite
+      # the file the host repo owns.
+      - ./db/migrations:/migrations:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      # Context is the REPO ROOT, not ./backend. backend/Dockerfile copies
+      # both backend/ and ingestion/ (the API imports ingestion helpers),
+      # so a ./backend context makes the build fail outright on the
+      # `COPY ingestion/` line.
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/fincopilot
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      ALPACA_API_KEY: ${ALPACA_API_KEY}
+      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY}
+      ALPACA_BASE_URL: ${ALPACA_BASE_URL:-https://paper-api.alpaca.markets}
+      ALPACA_DATA_URL: ${ALPACA_DATA_URL:-https://data.alpaca.markets}
+      ALPACA_DATA_FEED: ${ALPACA_DATA_FEED:-iex}
+      # /health reports these as configured or not; without them the news
+      # panel and the email alerts quietly report "not configured".
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      NEWS_API_KEY: ${NEWS_API_KEY}
+      FMP_API_KEY: ${FMP_API_KEY}
+      EDGAR_USER_AGENT: ${EDGAR_USER_AGENT:-FinCopilot dev dev@example.com}
+      STARTING_CASH: ${STARTING_CASH:-100000}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Defaults to the same-origin /api path that nginx.conf proxies to
+        # the backend. Only override this if you're deploying the frontend
+        # and backend on different hosts, in which case it must be the
+        # backend's real public URL — and note Vite bakes it in at BUILD
+        # time, so changing it means a rebuild, not a restart.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  scheduler:
+    build:
+      # Root context for the same reason as the backend: the daily job
+      # ingests prices and news, which lives in ingestion/.
+      context: .
+      dockerfile: ml/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/fincopilot
+      # Price and news ingestion run inside the daily job, so the
+      # scheduler needs the same data-source keys the CLI scripts use.
+      ALPACA_API_KEY: ${ALPACA_API_KEY}
+      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY}
+      ALPACA_DATA_URL: ${ALPACA_DATA_URL:-https://data.alpaca.markets}
+      ALPACA_DATA_FEED: ${ALPACA_DATA_FEED:-iex}
+      FMP_API_KEY: ${FMP_API_KEY}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      NEWS_API_KEY: ${NEWS_API_KEY}
+      # Scoring headlines downloads FinBERT (~400MB) on first run. Set to
+      # 0 to skip it and keep the container light — predictions then run
+      # on whatever sentiment is already stored.
+      SCHEDULER_RUN_SENTIMENT: ${SCHEDULER_RUN_SENTIMENT:-1}
+      SCHEDULER_HOUR: ${SCHEDULER_HOUR:-6}
+      # How far back each run re-fetches. Passed through explicitly so
+      # they're tunable from .env — scheduler.py reads them either way,
+      # but without these lines the only way to change them in a compose
+      # deployment is editing this file.
+      SCHEDULER_PRICE_DAYS: ${SCHEDULER_PRICE_DAYS:-7}
+      SCHEDULER_NEWS_DAYS: ${SCHEDULER_NEWS_DAYS:-3}
+      # Cache the model between restarts instead of re-downloading.
+      HF_HOME: /cache/huggingface
+    volumes:
+      - hfcache:/cache/huggingface
+    # No exposed ports — this is a background worker. It logs what it did
+    # each day: docker compose logs -f scheduler
+
+volumes:
+  pgdata:
+  hfcache:

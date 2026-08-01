@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r tests/requirements.txt
+
+      - name: Compile check
+        run: |
+          python -m py_compile backend/*.py
+          python -m py_compile backend/routers/*.py
+          python -m py_compile ml/*.py
+          python -m py_compile ingestion/*.py
+          python -m py_compile eval/*.py
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=backend --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Check build output
+        run: |
+          test -f frontend/dist/index.html || exit 1
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Backend and ML build from the REPO ROOT, matching docker-compose.yml.
+      # Both Dockerfiles COPY ingestion/ alongside their own directory, so a
+      # ./backend or ./ml context fails on the first COPY. Only the frontend
+      # is self-contained enough to build from its own directory.
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile -t fincopilot-backend:test .
+
+      - name: Build frontend image
+        run: docker build -t fincopilot-frontend:test ./frontend
+
+      - name: Build ML image
+        run: docker build -f ml/Dockerfile -t fincopilot-ml:test .

@@ -1,0 +1,13 @@
+torch==2.5.1
+transformers==4.46.0
+pandas==2.2.3
+numpy==1.26.4
+apscheduler==3.10.4
+psycopg2-binary==2.9.9
+# Every module in ml/ calls load_dotenv() at import time. Omitting this
+# didn't surface in a local dev shell that already had it, but made the
+# scheduler container die on its first import.
+python-dotenv==1.0.1
+# The daily job ingests prices and news before predicting; both fetchers
+# are HTTP clients.
+requests==2.32.3

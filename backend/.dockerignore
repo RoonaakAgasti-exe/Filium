@@ -1,0 +1,11 @@
+# This file is INERT — do not add exclusions here expecting them to apply.
+#
+# Docker reads `.dockerignore` from the build *context* root, and the
+# backend image builds with the repo root as its context (it needs
+# ingestion/ alongside backend/ — see the header of backend/Dockerfile).
+# So the file that actually trims this image's context is /.dockerignore,
+# not this one. The patterns that used to live here are all present there.
+#
+# Kept as a signpost rather than deleted, because an exclusion added here
+# would silently do nothing — including one meant to keep a secret out of
+# an image layer. Put it in /.dockerignore instead.

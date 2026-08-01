@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "ticker": "AAPL",
+    "question": "What does the company say about risks from semiconductor supply chain disruptions?",
+    "notes": "Fill this in by reading the actual filing and writing what a correct answer should mention."
+  },
+  {
+    "id": 2,
+    "ticker": "AAPL",
+    "question": "How did net sales change year over year and what drove the change?",
+    "notes": ""
+  }
+]

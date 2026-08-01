@@ -1,0 +1,11 @@
+# The image runs `npm install` itself, so a host node_modules is both
+# redundant and the largest thing in the context — and copying one built
+# on a different platform in leaves native modules that won't run.
+node_modules
+
+# Rebuilt by `npm run build` inside the image.
+dist
+
+.env
+.env.local
+.env.*.local

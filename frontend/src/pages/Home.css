@@ -1,0 +1,380 @@
+.home-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.home-col-main, .home-col-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1);
+}
+
+/* ---- "Cards" — dark VISA-style balance card + gradient buying-power card ---- */
+
+.cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .cards-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.paper-card {
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 148px;
+  box-shadow: var(--shadow-card);
+}
+
+.paper-card-dark {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(75, 111, 255, 0.35), transparent 55%),
+    linear-gradient(155deg, #1d1e25 0%, #14151a 100%);
+}
+
+.paper-card-teal {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.15), transparent 55%),
+    linear-gradient(155deg, #17a884 0%, #0f6e5a 60%, #0a4a3c 100%);
+}
+
+.paper-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.paper-card-balance {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.paper-card-dots {
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.paper-card-mask {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  margin: var(--space-3) 0;
+}
+
+.paper-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.06em;
+}
+
+.paper-card-brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.switch-on-card {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.switch-on-card.switch-on {
+  background: #ffffff;
+}
+
+.switch-on-card.switch-on .switch-knob {
+  background: var(--color-secondary-dim);
+}
+
+/* ---- quick actions row ---- */
+
+.quick-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.qa {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.qa-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qa-active {
+  flex-direction: row;
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: 13px 22px;
+  gap: 8px;
+  font-size: 13.5px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ---- recent trades table ---- */
+
+.sales-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sales-table th {
+  text-align: left;
+  color: var(--color-text-faint);
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.sales-table td {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border-soft);
+  vertical-align: middle;
+}
+
+.sales-table tr:last-child td {
+  border-bottom: none;
+}
+
+.sales-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sales-name-main {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.sales-name-sub {
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+  text-transform: capitalize;
+}
+
+/* ---- Statistic donut card ---- */
+
+.range-select {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.stat-donut-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: var(--space-2) 0;
+}
+
+.stat-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-donut-label {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-donut-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.stat-legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.stat-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.stat-tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.stat-tx-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stat-tx-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat-tx-ticker {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stat-tx-meta {
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.stat-tx-amount {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ---- watchlist quick-add ---- */
+
+.watch-input-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.watch-input-row input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.watch-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-3);
+}
+
+/* ---- quick trade modal ---- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 21, 30, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: var(--space-3);
+}
+
+.modal-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 24px 60px -20px rgba(20, 21, 30, 0.4);
+}
+
+.modal-close {
+  background: var(--color-surface-sunken);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.trade-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.trade-row input {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+}

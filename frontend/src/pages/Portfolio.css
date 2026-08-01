@@ -1,0 +1,81 @@
+.port-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.port-col-main, .port-col-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.holdings-table th {
+  text-align: left;
+  color: var(--color-text-faint);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 0 var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.holdings-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border-soft);
+  vertical-align: middle;
+}
+
+.holdings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.holdings-ticker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.holdings-ticker .ticker-chip {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+  border-radius: 8px;
+}
+
+.trade-panel .trade-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.trade-panel .trade-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.trade-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.trade-actions .btn {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .port-grid {
+    grid-template-columns: 1fr;
+  }
+  .holdings-table {
+    font-size: 12px;
+  }
+}
