@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, Plus, Trash2, ToggleLeft, ToggleRight, Zap, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, Zap, MessageSquare } from 'lucide-react';
 import Layout from '../components/Layout';
 import Topbar from '../components/Topbar';
 import { api } from '../api/client';
@@ -23,7 +23,7 @@ function formatThreshold(ruleType, threshold) {
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [events, setEvents] = useState([]);
-  const [ruleTypes, setRuleTypes] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showNatural, setShowNatural] = useState(false);
@@ -34,14 +34,15 @@ export default function Alerts() {
 
   async function loadAll() {
     try {
-      const [a, e, rt] = await Promise.allSettled([
+      const [a, e] = await Promise.allSettled([
         api.getAlerts(),
         api.getAlertEvents(),
-        api.getAlertRuleTypes(),
       ]);
       if (a.status === 'fulfilled') setAlerts(a.value);
-      if (e.status === 'fulfilled') setEvents(e.value);
-      if (rt.status === 'fulfilled') setRuleTypes(rt.value);
+      if (e.status === 'fulfilled') {
+        setEvents(e.value.events || []);
+        setUnreadCount(e.value.unread_count ?? 0);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -123,8 +124,6 @@ export default function Alerts() {
       setError(err.message);
     }
   }
-
-  const unreadCount = events.filter((e) => !e.is_read).length;
 
   return (
     <Layout>

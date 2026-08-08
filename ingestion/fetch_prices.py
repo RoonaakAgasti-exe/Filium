@@ -122,18 +122,37 @@ def fetch_from_fmp(ticker: str, start: date, end: date) -> list[dict]:
     if not _looks_real(FMP_API_KEY):
         raise RuntimeError("FMP_API_KEY not configured")
 
-    url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}"
-    params = {"from": start.isoformat(), "to": end.isoformat(), "apikey": FMP_API_KEY}
+    # The /api/v3/historical-price-full/ endpoint this used to call is now
+    # closed to anyone who didn't subscribe before 2025-08-31. It answers a
+    # current free-tier key with 403 "Legacy Endpoint", which reads like a
+    # bad key but isn't. /stable/historical-price-eod/full is the live
+    # replacement; it returns a flat array rather than {"historical": [...]}.
+    url = "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    params = {
+        "symbol": ticker,
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+        "apikey": FMP_API_KEY,
+    }
     resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status()
-    payload = resp.json()
 
     # FMP answers an invalid key with HTTP 200 and an {"Error Message": ...}
-    # body, so status_code alone can't be trusted here.
-    if isinstance(payload, dict) and "Error Message" in payload:
-        raise RuntimeError(f"FMP error: {payload['Error Message']}")
+    # body, and a retired endpoint with 403 and the same shape, so neither
+    # status_code nor the body alone can be trusted on its own.
+    try:
+        payload = resp.json()
+    except ValueError:
+        resp.raise_for_status()
+        raise RuntimeError(f"FMP returned a non-JSON response for {ticker}")
 
-    rows = (payload or {}).get("historical") or []
+    if isinstance(payload, dict):
+        message = payload.get("Error Message") or payload.get("message")
+        if message:
+            raise RuntimeError(f"FMP error (HTTP {resp.status_code}): {message}")
+
+    resp.raise_for_status()
+
+    rows = payload if isinstance(payload, list) else (payload or {}).get("historical") or []
     if not rows:
         raise RuntimeError(f"FMP returned no history for {ticker}")
 

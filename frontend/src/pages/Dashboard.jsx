@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  BarChart, Bar, Cell,
+  BarChart, Bar, Cell, ComposedChart, Line,
 } from 'recharts';
 import { Search, TrendingUp, TrendingDown, Star, Zap } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -22,7 +22,11 @@ function formatMoney(n, opts = {}) {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2, ...opts });
 }
 
-/** Confidence ring — real SVG gauge, no chart-library gauge needed. */
+function formatPct(n, digits = 1) {
+  if (n == null) return '—';
+  return `${(n * 100).toFixed(digits)}%`;
+}
+
 function ConfidenceRing({ value, direction }) {
   const size = 96;
   const stroke = 9;
@@ -60,12 +64,15 @@ export default function Dashboard() {
   const [predHistory, setPredHistory] = useState([]);
   const [candles, setCandles] = useState([]);
   const [quote, setQuote] = useState(null);
+  const [news, setNews] = useState([]);
+  const [sentiment, setSentiment] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [range, setRange] = useState(RANGES[2]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [tradeBusy, setTradeBusy] = useState(false);
   const [tradeMsg, setTradeMsg] = useState('');
+  const [calibration, setCalibration] = useState(null);
 
   useEffect(() => {
     api.getWatchlist().then(setWatchlist).catch(() => {});
@@ -81,13 +88,21 @@ export default function Dashboard() {
     setPredHistory([]);
     setCandles([]);
     setQuote(null);
+    setNews([]);
+    setSentiment(null);
 
-    const [predResult, backtestResult, histResult, priceResult, quoteResult] = await Promise.allSettled([
+    const [
+      predResult, backtestResult, histResult, priceResult, quoteResult,
+      newsResult, sentimentResult, calibResult,
+    ] = await Promise.allSettled([
       api.getPrediction(t),
       api.getBacktest(t),
       api.getPredictionHistory(t, 40),
       api.getPriceHistory(t, days),
       api.getLatestQuote(t),
+      api.getNews(t, 12),
+      api.getSentimentTimeline(t, days),
+      api.getCalibration(t, 5),
     ]);
 
     if (predResult.status === 'fulfilled') setPrediction(predResult.value);
@@ -95,6 +110,10 @@ export default function Dashboard() {
     if (histResult.status === 'fulfilled') setPredHistory(histResult.value);
     if (priceResult.status === 'fulfilled') setCandles(priceResult.value.candles);
     if (quoteResult.status === 'fulfilled') setQuote(quoteResult.value);
+    if (newsResult.status === 'fulfilled') setNews(newsResult.value.articles || []);
+    if (sentimentResult.status === 'fulfilled') setSentiment(sentimentResult.value);
+    if (calibResult.status === 'fulfilled') setCalibration(calibResult.value);
+    else setCalibration(null);
 
     if ([predResult, backtestResult, priceResult].every((r) => r.status === 'rejected')) {
       setError(`No data found for ${t.toUpperCase()} yet — try a ticker that's been ingested.`);
@@ -108,7 +127,6 @@ export default function Dashboard() {
       setTickerInput(urlTicker);
       loadTicker(urlTicker, range.days);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTicker]);
 
   function handleLookup(e) {
@@ -147,6 +165,18 @@ export default function Dashboard() {
   const latestClose = candles.length ? candles[candles.length - 1].close : null;
   const firstClose = candles.length ? candles[0].close : null;
   const periodChange = latestClose != null && firstClose ? (latestClose - firstClose) / firstClose : null;
+
+  const sentimentChart = useMemo(() => {
+    if (!sentiment?.points?.length) return [];
+    return sentiment.points
+      .filter((p) => p.sentiment != null)
+      .map((p) => ({
+        date: p.date,
+        sentiment: p.sentiment,
+        close: p.close,
+        articles: p.article_count,
+      }));
+  }, [sentiment]);
 
   const accuracyTrend = useMemo(() => {
     let correct = 0;
@@ -289,6 +319,88 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
             )}
+
+            {(sentimentChart.length > 0 || news.length > 0) && (
+              <div className="card">
+                <div className="card-head">
+                  <div>
+                    <h3 className="card-title">News &amp; sentiment</h3>
+                    <span className="page-sub">
+                      The FinBERT score the augmented model actually trains on.
+                    </span>
+                  </div>
+                  {sentiment?.average_sentiment != null && (
+                    <span className={`badge ${sentiment.average_sentiment >= 0 ? 'badge-gain' : 'badge-loss'}`}>
+                      avg {sentiment.average_sentiment >= 0 ? '+' : ''}
+                      {sentiment.average_sentiment.toFixed(2)} over {sentiment.days_with_sentiment} day(s)
+                    </span>
+                  )}
+                </div>
+
+                {sentimentChart.length > 1 ? (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <ComposedChart data={sentimentChart}>
+                      <CartesianGrid vertical={false} stroke="var(--color-border-soft)" />
+                      <XAxis dataKey="date" stroke="var(--color-text-faint)" fontSize={10} tickLine={false} axisLine={false} minTickGap={40} />
+                      {}
+                      <YAxis yAxisId="sentiment" stroke="var(--color-text-faint)" fontSize={10} tickLine={false} axisLine={false} domain={[-1, 1]} width={40} />
+                      <YAxis yAxisId="price" orientation="right" stroke="var(--color-text-faint)" fontSize={10} tickLine={false} axisLine={false} domain={['auto', 'auto']} width={52} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--color-surface-raised)', border: '1px solid var(--color-border)', borderRadius: 10, fontSize: 12 }}
+                        formatter={(v, n) => (
+                          n === 'sentiment'
+                            ? [v.toFixed(3), 'Sentiment']
+                            : [formatMoney(v), 'Close']
+                        )}
+                      />
+                      <Bar yAxisId="sentiment" dataKey="sentiment" radius={[3, 3, 3, 3]}>
+                        {sentimentChart.map((d, i) => (
+                          <Cell key={i} fill={d.sentiment >= 0 ? 'var(--color-gain)' : 'var(--color-loss)'} />
+                        ))}
+                      </Bar>
+                      <Line yAxisId="price" type="monotone" dataKey="close" stroke="var(--color-accent)" strokeWidth={2} dot={false} connectNulls />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="empty-state">
+                    No scored sentiment for {ticker} yet — run{' '}
+                    <code>ingestion/fetch_news.py</code> then <code>ml/sentiment.py</code>.
+                  </p>
+                )}
+
+                {news.length > 0 && (
+                  <div className="news-list">
+                    {news.map((a, i) => (
+                      <a
+                        key={i}
+                        className="news-row"
+                        href={a.url || undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <span
+                          className="news-dot"
+                          style={{
+                            background: a.sentiment_score == null
+                              ? 'var(--color-border)'
+                              : a.sentiment_score > 0.05
+                                ? 'var(--color-gain)'
+                                : a.sentiment_score < -0.05
+                                  ? 'var(--color-loss)'
+                                  : 'var(--color-pending)',
+                          }}
+                          title={a.sentiment_score == null
+                            ? 'Not scored yet'
+                            : `FinBERT ${a.sentiment_score >= 0 ? '+' : ''}${a.sentiment_score.toFixed(2)}`}
+                        />
+                        <span className="news-headline">{a.headline}</span>
+                        <span className="news-meta mono">{a.published_date}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="pred-col-side">
@@ -337,7 +449,7 @@ export default function Dashboard() {
                 </div>
                 <div className="backtest-stats">
                   <div className="backtest-stat">
-                    <span className="backtest-stat-value mono">{(backtest.accuracy * 100).toFixed(1)}%</span>
+                    <span className="backtest-stat-value mono">{formatPct(backtest.accuracy)}</span>
                     <span className="backtest-stat-label">accuracy</span>
                   </div>
                   <div className="backtest-stat">
@@ -353,6 +465,61 @@ export default function Dashboard() {
                     <span className="backtest-stat-label">total</span>
                   </div>
                 </div>
+                {backtest.accuracy == null && (
+                  <p className="page-sub" style={{ marginTop: 10 }}>
+                    No accuracy yet — a prediction only counts once the nightly
+                    backtest has a real closing price to score it against.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {calibration && calibration.num_resolved >= 3 && (
+              <div className="card">
+                <div className="card-head">
+                  <h3 className="card-title">Calibration</h3>
+                  <span className="page-sub mono">{calibration.num_resolved} resolved</span>
+                </div>
+                <div className="calib-scores">
+                  <div className="calib-score">
+                    <span className="calib-score-val mono">
+                      {calibration.brier_score != null ? calibration.brier_score.toFixed(3) : '—'}
+                    </span>
+                    <span className="calib-score-label">Brier score</span>
+                  </div>
+                  <div className="calib-score">
+                    <span className="calib-score-val mono">
+                      {calibration.expected_calibration_error != null
+                        ? formatPct(calibration.expected_calibration_error)
+                        : '—'}
+                    </span>
+                    <span className="calib-score-label">Cal. error (ECE)</span>
+                  </div>
+                </div>
+                {calibration.bins?.length > 0 && (
+                  <div className="calib-chart">
+                    <span className="calib-axis-label">Predicted</span>
+                    {calibration.bins.map((b, i) => (
+                      <div key={i} className="calib-bin" title={`${formatPct(b.bin_center)} predicted → ${formatPct(b.actual_rate)} actual (${b.count} predictions)`}>
+                        <div className="calib-bars">
+                          <div
+                            className="calib-bar calib-bar-actual"
+                            style={{ height: `${Math.max(2, (b.actual_rate ?? 0) * 80)}px` }}
+                          />
+                          <div
+                            className="calib-bar calib-bar-ideal"
+                            style={{ height: `${Math.max(2, b.bin_center * 80)}px` }}
+                          />
+                        </div>
+                        <span className="calib-bin-label mono">{formatPct(b.bin_center)}</span>
+                      </div>
+                    ))}
+                    <p className="calib-legend">
+                      <span className="calib-dot calib-dot-actual"/> Actual &nbsp;
+                      <span className="calib-dot calib-dot-ideal"/> Ideal
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

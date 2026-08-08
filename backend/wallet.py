@@ -21,14 +21,11 @@ import config
 
 logger = logging.getLogger("fincopilot.wallet")
 
-
 class InsufficientFundsError(Exception):
     pass
 
-
 class InsufficientSharesError(Exception):
     pass
-
 
 def ensure_wallet(conn: PgConnection, user_id: int) -> None:
     cur = conn.cursor()
@@ -41,7 +38,6 @@ def ensure_wallet(conn: PgConnection, user_id: int) -> None:
     finally:
         cur.close()
 
-
 def get_cash_balance(conn: PgConnection, user_id: int) -> float:
     cur = conn.cursor()
     try:
@@ -53,14 +49,12 @@ def get_cash_balance(conn: PgConnection, user_id: int) -> float:
         raise ValueError(f"No wallet found for user {user_id}")
     return float(row[0])
 
-
 def _lock_cash_balance(cur, user_id: int) -> float:
     cur.execute("SELECT cash_balance FROM wallets WHERE user_id = %s FOR UPDATE", (user_id,))
     row = cur.fetchone()
     if row is None:
         raise ValueError(f"No wallet found for user {user_id}")
     return float(row[0])
-
 
 def get_holding(conn: PgConnection, user_id: int, ticker: str) -> dict | None:
     cur = conn.cursor()
@@ -76,7 +70,6 @@ def get_holding(conn: PgConnection, user_id: int, ticker: str) -> dict | None:
         return None
     return {"shares": float(row[0]), "avg_cost_basis": float(row[1])}
 
-
 def _lock_holding(cur, user_id: int, ticker: str) -> dict | None:
     cur.execute(
         "SELECT shares, avg_cost_basis FROM holdings "
@@ -87,7 +80,6 @@ def _lock_holding(cur, user_id: int, ticker: str) -> dict | None:
     if row is None:
         return None
     return {"shares": float(row[0]), "avg_cost_basis": float(row[1])}
-
 
 def buy_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
                price: float, triggered_by_prediction: bool = False) -> dict:
@@ -108,9 +100,6 @@ def buy_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
     try:
         cash = _lock_cash_balance(cur, user_id)
 
-        # Round to cents before comparing: a cost of 100000.000000001 from
-        # float multiplication would otherwise reject a trade the user can
-        # exactly afford.
         if round(cost, 2) > round(cash, 2):
             raise InsufficientFundsError(
                 f"Cost ${cost:,.2f} exceeds available cash ${cash:,.2f}"
@@ -130,7 +119,6 @@ def buy_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
         else:
             old_shares, old_avg_cost = existing["shares"], existing["avg_cost_basis"]
             new_shares = old_shares + shares
-            # weighted average: total cost so far / total shares so far
             new_avg_cost = ((old_shares * old_avg_cost) + (shares * price)) / new_shares
             cur.execute(
                 "UPDATE holdings SET shares = %s, avg_cost_basis = %s "
@@ -161,7 +149,6 @@ def buy_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
         "realized_pl": None,
     }
 
-
 def sell_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
                 price: float, triggered_by_prediction: bool = False) -> dict:
     """
@@ -181,8 +168,6 @@ def sell_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
     cur = conn.cursor()
 
     try:
-        # Lock in the same order as buy_shares (wallet, then holding) so
-        # concurrent buy/sell on one account can't deadlock against each other.
         cash = _lock_cash_balance(cur, user_id)
         existing = _lock_holding(cur, user_id, ticker)
 
@@ -229,7 +214,6 @@ def sell_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
         "remaining_shares": remaining_shares,
         "realized_pl": realized_pl,
     }
-
 
 def get_portfolio(conn: PgConnection, user_id: int, current_prices: dict[str, float]) -> dict:
     """
@@ -281,6 +265,30 @@ def get_portfolio(conn: PgConnection, user_id: int, current_prices: dict[str, fl
         "total_value": cash + holdings_value,
     }
 
+def deposit_cash(conn: PgConnection, user_id: int, amount: float, *, mode: str = "add") -> float:
+    """
+    Adds cash or sets the balance outright. Used by /wallet/deposit so a
+    paper account can be topped up without minting a new guest identity.
+    """
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+    if mode not in ("add", "set"):
+        raise ValueError("mode must be 'add' or 'set'")
+
+    ensure_wallet(conn, user_id)
+    cur = conn.cursor()
+    try:
+        cash = _lock_cash_balance(cur, user_id)
+        new_cash = amount if mode == "set" else cash + amount
+        cur.execute("UPDATE wallets SET cash_balance = %s WHERE user_id = %s", (new_cash, user_id))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+
+    return new_cash
 
 def save_daily_snapshot(conn: PgConnection, user_id: int, as_of: date, portfolio: dict) -> None:
     cur = conn.cursor()

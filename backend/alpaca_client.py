@@ -1,16 +1,21 @@
 """
 alpaca_client.py
 
-Thin wrapper around Alpaca's Paper Trading REST API. Real market prices,
-fake money, zero real financial risk — see project README for why paper
-trading was chosen over a fully custom wallet simulation.
+Thin wrapper around Alpaca's Paper Trading REST API.
+
+This is an optional upgrade, not a dependency. Alpaca gives the freshest
+quotes, but getting a key means a brokerage signup with identity checks,
+so nothing here is on the critical path: the paper-trading ledger lives
+in `wallets`/`holdings`, and market_data falls through to keyed-free
+quote sources when this module is unconfigured. An app with no Alpaca
+account at all is fully functional, just priced off a delayed quote.
 
 Every function raises `AlpacaUnavailable` (never a bare requests error)
 when keys are missing or the API is unreachable, so callers can fall back
-to stored price history instead of returning a 500. Building the auth
-headers at call time rather than import time matters: a None-valued
-header makes `requests` raise InvalidHeader from deep inside the stack,
-which reads like a bug rather than "you haven't set your API keys".
+to another source instead of returning a 500. Building the auth headers
+at call time rather than import time matters: a None-valued header makes
+`requests` raise InvalidHeader from deep inside the stack, which reads
+like a bug rather than "you haven't set your API keys".
 """
 
 import logging
@@ -23,14 +28,11 @@ logger = logging.getLogger("fincopilot.alpaca")
 
 TIMEOUT = 10
 
-
 class AlpacaUnavailable(RuntimeError):
     """Alpaca isn't configured, or the request to it failed."""
 
-
 def is_configured() -> bool:
     return config.ALPACA_ENABLED
-
 
 def _headers() -> dict:
     if not config.ALPACA_ENABLED:
@@ -42,6 +44,20 @@ def _headers() -> dict:
         "APCA-API-SECRET-KEY": config.ALPACA_SECRET_KEY,
     }
 
+def _feed_error(ticker: str) -> AlpacaUnavailable:
+    """
+    A 403 from the data API almost always means the feed, not the key.
+
+    Free accounts have no SIP entitlement, so a request that omits `feed`
+    (or asks for `sip`) is rejected with a status that reads like bad
+    credentials. Saying which knob to turn is the whole difference between
+    a five-second fix and an afternoon re-issuing API keys that were fine.
+    """
+    return AlpacaUnavailable(
+        f"Alpaca rejected the market data request for {ticker} on feed "
+        f"'{config.ALPACA_DATA_FEED}' (403). Free accounts only get the IEX "
+        f"feed — set ALPACA_DATA_FEED=iex."
+    )
 
 def get_latest_price(ticker: str) -> float:
     """Latest trade price for a ticker from Alpaca's market data API."""
@@ -49,7 +65,10 @@ def get_latest_price(ticker: str) -> float:
     url = f"{config.ALPACA_DATA_URL}/v2/stocks/{ticker}/trades/latest"
 
     try:
-        resp = requests.get(url, headers=headers, timeout=TIMEOUT)
+        resp = requests.get(url, headers=headers,
+                            params={"feed": config.ALPACA_DATA_FEED}, timeout=TIMEOUT)
+        if resp.status_code == 403:
+            raise _feed_error(ticker)
         resp.raise_for_status()
         data = resp.json()
         return float(data["trade"]["p"])
@@ -58,7 +77,6 @@ def get_latest_price(ticker: str) -> float:
     except (KeyError, TypeError, ValueError) as exc:
         raise AlpacaUnavailable(f"Unexpected Alpaca response shape for {ticker}: {exc}") from exc
 
-
 def get_daily_bars(ticker: str, start: str, end: str, limit: int = 1000) -> list[dict]:
     """
     Daily OHLCV bars between two ISO dates. Used by the price ingestion
@@ -66,10 +84,19 @@ def get_daily_bars(ticker: str, start: str, end: str, limit: int = 1000) -> list
     """
     headers = _headers()
     url = f"{config.ALPACA_DATA_URL}/v2/stocks/{ticker}/bars"
-    params = {"timeframe": "1Day", "start": start, "end": end, "limit": limit, "adjustment": "split"}
+    params = {
+        "timeframe": "1Day",
+        "start": start,
+        "end": end,
+        "limit": limit,
+        "adjustment": "split",
+        "feed": config.ALPACA_DATA_FEED,
+    }
 
     try:
         resp = requests.get(url, headers=headers, params=params, timeout=30)
+        if resp.status_code == 403:
+            raise _feed_error(ticker)
         resp.raise_for_status()
         payload = resp.json()
     except requests.RequestException as exc:
@@ -88,7 +115,6 @@ def get_daily_bars(ticker: str, start: str, end: str, limit: int = 1000) -> list
         for bar in bars
     ]
 
-
 def submit_paper_order(ticker: str, qty: float, side: str) -> dict:
     """
     Submits a market order to Alpaca's paper trading account.
@@ -100,8 +126,10 @@ def submit_paper_order(ticker: str, qty: float, side: str) -> dict:
     production system would poll the order status or use a webhook to
     confirm the actual fill price before updating the ledger.
 
-    The app's own ledger in `wallets`/`holdings` is the source of truth;
-    this is only called when MIRROR_ORDERS_TO_ALPACA is enabled.
+    The app's own ledger in `wallets`/`holdings` is the source of truth
+    and is never reconciled against this. Nothing in the request path
+    calls it today — it exists so that mirroring trades to a real Alpaca
+    paper account is a one-line change for anyone who does have a key.
     """
     headers = _headers()
     url = f"{config.ALPACA_BASE_URL}/v2/orders"

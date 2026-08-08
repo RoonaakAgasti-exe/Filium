@@ -18,11 +18,6 @@ from models import BacktestSummary, PredictionResponse
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
-
-# Static paths are declared before /{ticker} so a request for
-# /predictions/leaderboard isn't captured by the ticker parameter.
-
-
 @router.get("/models")
 def list_models(conn: PgConnection = Depends(get_conn)):
     cur = conn.cursor()
@@ -47,7 +42,6 @@ def list_models(conn: PgConnection = Depends(get_conn)):
         }
         for r in rows
     ]
-
 
 @router.get("/leaderboard")
 def leaderboard(ticker: str | None = None, conn: PgConnection = Depends(get_conn)):
@@ -88,8 +82,6 @@ def leaderboard(ticker: str | None = None, conn: PgConnection = Depends(get_conn
             "expected_calibration_error": calibration["expected_calibration_error"],
         })
 
-    # Models with no resolved predictions sort last — an unmeasured model
-    # shouldn't appear to be beating a measured one.
     board.sort(key=lambda r: (r["live_accuracy"] is None, -(r["live_accuracy"] or 0)))
 
     return {
@@ -100,7 +92,6 @@ def leaderboard(ticker: str | None = None, conn: PgConnection = Depends(get_conn
             "resolved by the nightly backtest job."
         ),
     }
-
 
 @router.get("/{ticker}", response_model=PredictionResponse)
 def get_latest_prediction(ticker: str, model_version_id: int | None = None,
@@ -119,8 +110,6 @@ def get_latest_prediction(ticker: str, model_version_id: int | None = None,
         params.append(model_version_id)
         sql.append("ORDER BY p.prediction_date DESC, p.id DESC")
     else:
-        # Prefer the model flagged active so the headline signal doesn't
-        # silently flip between models depending on insertion order.
         sql.append("ORDER BY m.is_active DESC, p.prediction_date DESC, p.id DESC")
 
     sql.append("LIMIT 1")
@@ -145,7 +134,6 @@ def get_latest_prediction(ticker: str, model_version_id: int | None = None,
         prob_up=float(row[5]) if row[5] is not None else None,
         actual_direction=row[6], model_name=row[7],
     )
-
 
 @router.get("/{ticker}/history")
 def get_prediction_history(ticker: str, limit: int = 30, model_version_id: int | None = None,
@@ -178,7 +166,7 @@ def get_prediction_history(ticker: str, limit: int = 30, model_version_id: int |
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"No predictions found for {ticker.upper()}")
 
-    rows = list(reversed(rows))  # chronological order for charting
+    rows = list(reversed(rows))
     return [
         {
             "ticker": r[0],
@@ -194,7 +182,6 @@ def get_prediction_history(ticker: str, limit: int = 30, model_version_id: int |
         for r in rows
     ]
 
-
 @router.get("/{ticker}/backtest", response_model=BacktestSummary)
 def get_backtest_summary(ticker: str, model_version_id: int | None = None,
                          conn: PgConnection = Depends(get_conn)):
@@ -205,7 +192,6 @@ def get_backtest_summary(ticker: str, model_version_id: int | None = None,
                             detail=f"No predictions found for {ticker.upper()}")
 
     return BacktestSummary(ticker=ticker.upper(), **summary)
-
 
 @router.get("/{ticker}/calibration")
 def get_calibration(ticker: str, bins: int = Query(default=5, ge=2, le=20),

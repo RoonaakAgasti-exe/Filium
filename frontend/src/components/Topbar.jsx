@@ -26,9 +26,6 @@ export default function Topbar() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  // Real notifications: pull the watchlist, then the latest prediction for
-  // each ticker on it, and surface the highest-confidence signals — no
-  // mock data, just a different view of what the backend already knows.
   async function loadSignals() {
     if (signalsLoaded) return;
     try {

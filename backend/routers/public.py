@@ -16,7 +16,6 @@ from db import get_conn
 
 router = APIRouter(prefix="/public", tags=["public"])
 
-
 @router.get("/tickers")
 def list_public_tickers(conn: PgConnection = Depends(get_conn)):
     """Every ticker with at least one prediction — the index of shareable pages."""
@@ -43,7 +42,6 @@ def list_public_tickers(conn: PgConnection = Depends(get_conn)):
         }
         for r in rows
     ]
-
 
 @router.get("/{ticker}")
 def public_ticker_page(ticker: str, history_days: int = Query(default=60, ge=1, le=365),

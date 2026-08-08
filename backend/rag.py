@@ -20,15 +20,15 @@ are mapped back to real chunk IDs afterwards.
 import logging
 import re
 
-import config
+import embeddings
 import llm
 from db import to_vector_literal
 
 logger = logging.getLogger("fincopilot.rag")
 
-TOP_K_RETRIEVE = 8   # how many chunks to pull from the DB before reranking
-TOP_K_FINAL = 4      # how many chunks actually go into the LLM prompt
-EXCERPT_CHARS = 1200  # how much chunk text to hand back to the UI per source
+TOP_K_RETRIEVE = 8
+TOP_K_FINAL = 4
+EXCERPT_CHARS = 1200
 
 SYSTEM_PROMPT = """You are a financial research assistant. You will be given
 excerpts from a company's SEC filings or earnings calls, each labeled with a
@@ -69,15 +69,8 @@ Rules:
 - Do not speculate about causes that the excerpts don't support.
 """
 
-
 class NoDataError(RuntimeError):
     """Nothing has been ingested that could answer this."""
-
-
-# ---------------------------------------------------------------------
-# Retrieval
-# ---------------------------------------------------------------------
-
 
 def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
                     top_k: int = TOP_K_RETRIEVE, filing_id: int | None = None,
@@ -127,7 +120,6 @@ def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
     finally:
         cur.close()
 
-
 def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
     """
     Optional cross-encoder reranking step. Cross-encoders score a
@@ -160,9 +152,7 @@ def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
     scored = sorted(zip(chunks, scores), key=lambda x: x[1], reverse=True)
     return [c for c, _ in scored[:top_k]]
 
-
 _reranker = None
-
 
 def _get_reranker(cross_encoder_cls):
     """Loads the cross-encoder once — it's ~90MB and slow to construct per request."""
@@ -170,12 +160,6 @@ def _get_reranker(cross_encoder_cls):
     if _reranker is None:
         _reranker = cross_encoder_cls("cross-encoder/ms-marco-MiniLM-L-6-v2")
     return _reranker
-
-
-# ---------------------------------------------------------------------
-# Citations
-# ---------------------------------------------------------------------
-
 
 def extract_citation_ids(answer_text: str) -> set[int]:
     """Pulls out every [N] marker the LLM used, e.g. '[1]' and '[2, 3]'."""
@@ -187,7 +171,6 @@ def extract_citation_ids(answer_text: str) -> set[int]:
             if part.isdigit():
                 ids.add(int(part))
     return ids
-
 
 def build_source(marker: int, chunk: dict) -> dict:
     """
@@ -213,7 +196,6 @@ def build_source(marker: int, chunk: dict) -> dict:
         "distance": float(chunk["distance"]) if chunk.get("distance") is not None else None,
     }
 
-
 def build_prompt(query: str, chunks: list[dict], label: str = "Excerpts") -> str:
     blocks = []
     for i, c in enumerate(chunks, start=1):
@@ -223,24 +205,59 @@ def build_prompt(query: str, chunks: list[dict], label: str = "Excerpts") -> str
         )
     return f"{label}:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {query}"
 
-
 def _normalise(chunks: list[dict]) -> list[dict]:
     """retrieve_chunks returns `id`; the rest of this module expects `chunk_id`."""
     for c in chunks:
         c.setdefault("chunk_id", c.get("id"))
     return chunks
 
+EXTRACTIVE_PREAMBLE = (
+    "No answer-writing model is configured, so this is the raw evidence "
+    "rather than a written answer — the passages below are the ones that "
+    "matched your question most closely, in rank order."
+)
 
-# ---------------------------------------------------------------------
-# Public query entry points
-# ---------------------------------------------------------------------
+def extractive_answer(chunks: list[dict]) -> str:
+    """
+    The no-LLM answer: quote what retrieval found and say that's what it is.
 
+    Retrieval and generation fail independently — the local embedding
+    model needs no key, so a keyless deployment can still find the right
+    passage in a 200-page 10-K even though it cannot write prose about it.
+    Returning the passages is most of the value of the feature and none of
+    the risk: there is no model in the loop to invent a number, and the
+    citation markers are the same [N] the UI already knows how to resolve
+    to a highlighted source.
+    """
+    lines = [EXTRACTIVE_PREAMBLE, ""]
+    for i, c in enumerate(chunks, start=1):
+        section = c.get("section_label") or "unlabelled section"
+        snippet = " ".join((c["chunk_text"] or "").split())[:400]
+        lines.append(
+            f"- {c['ticker']} {c['filing_type']} ({c['filing_date']}), {section}: "
+            f"“{snippet}…” [{i}]"
+        )
+    return "\n".join(lines)
+
+def generate_answer(prompt: str, system: str, chunks: list[dict]) -> tuple[str, bool]:
+    """
+    Returns (answer_text, was_generated).
+
+    Every caller needs the same two-step: ask the LLM, and if there isn't
+    one, degrade to evidence rather than to an error. `was_generated`
+    travels back to the UI so it can label an extractive answer honestly
+    instead of presenting a list of quotes as if a model had written it.
+    """
+    try:
+        return llm.complete(prompt, system=system), True
+    except llm.LLMUnavailable as exc:
+        logger.info("Answering extractively: %s", exc)
+        return extractive_answer(chunks), False
 
 def answer_query(conn, query: str, ticker: str | None = None) -> dict:
     """Single-company (or corpus-wide) question answering."""
     tickers = [ticker] if ticker else None
     return _answer(conn, query, tickers, SYSTEM_PROMPT)
-
 
 def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
     """
@@ -255,7 +272,8 @@ def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
     if not tickers:
         raise ValueError("At least one ticker is required for a peer query.")
 
-    embedding = llm.embed([query])[0]
+    embeddings.assert_matches_corpus(conn)
+    embedding = llm.embed_query(query)
 
     per_ticker = max(2, TOP_K_FINAL // max(1, len(tickers)) + 1)
     collected: list[dict] = []
@@ -275,11 +293,12 @@ def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
         )
 
     prompt = build_prompt(query, collected)
-    answer_text = llm.complete(prompt, system=PEER_SYSTEM_PROMPT)
+    answer_text, generated = generate_answer(prompt, PEER_SYSTEM_PROMPT, collected)
     cited = extract_citation_ids(answer_text)
 
     return {
         "answer": answer_text,
+        "generated": generated,
         "sources": [build_source(i, c) for i, c in enumerate(collected, start=1) if i in cited],
         "all_sources": [build_source(i, c) for i, c in enumerate(collected, start=1)],
         "tickers_requested": tickers,
@@ -287,34 +306,29 @@ def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
         "tickers_missing": [t for t in tickers if t not in covered],
     }
 
-
 def _answer(conn, query: str, tickers: list[str] | None, system_prompt: str) -> dict:
-    embedding = llm.embed([query])[0]
+    embeddings.assert_matches_corpus(conn)
+    embedding = llm.embed_query(query)
     candidates = _normalise(retrieve_chunks(conn, embedding, tickers, TOP_K_RETRIEVE))
 
     if not candidates:
         scope = f" for {', '.join(tickers)}" if tickers else ""
         raise NoDataError(
             f"No filing data found{scope}. Ingest a filing first: "
-            f"python ingestion/fetch_filing.py <TICKER>"
+            f"python ingestion/ingest_filing.py <TICKER>"
         )
 
     top_chunks = rerank_chunks(query, candidates, TOP_K_FINAL)
     prompt = build_prompt(query, top_chunks)
-    answer_text = llm.complete(prompt, system=system_prompt)
+    answer_text, generated = generate_answer(prompt, system_prompt, top_chunks)
     cited = extract_citation_ids(answer_text)
 
     return {
         "answer": answer_text,
+        "generated": generated,
         "sources": [build_source(i, c) for i, c in enumerate(top_chunks, start=1) if i in cited],
         "all_sources": [build_source(i, c) for i, c in enumerate(top_chunks, start=1)],
     }
-
-
-# ---------------------------------------------------------------------
-# Filing comparison (PDF: "Filing comparisons")
-# ---------------------------------------------------------------------
-
 
 def list_filings(conn, ticker: str) -> list[dict]:
     cur = conn.cursor()
@@ -339,7 +353,6 @@ def list_filings(conn, ticker: str) -> list[dict]:
     for r in rows:
         r["filing_date"] = str(r["filing_date"])
     return rows
-
 
 def compare_filings(conn, ticker: str, question: str,
                     earlier_filing_id: int | None = None,
@@ -368,7 +381,7 @@ def compare_filings(conn, ticker: str, question: str,
     by_id = {f["id"]: f for f in filings}
 
     if later_filing_id is None:
-        later = filings[0]           # list_filings is newest-first
+        later = filings[0]
     else:
         later = by_id.get(later_filing_id)
     if earlier_filing_id is None:
@@ -381,12 +394,11 @@ def compare_filings(conn, ticker: str, question: str,
     if earlier["id"] == later["id"]:
         raise ValueError("Pick two different filings to compare.")
 
-    # Order defensively: a caller passing the dates the other way round
-    # would otherwise get a diff described backwards.
     if earlier["filing_date"] > later["filing_date"]:
         earlier, later = later, earlier
 
-    embedding = llm.embed([question])[0]
+    embeddings.assert_matches_corpus(conn)
+    embedding = llm.embed_query(question)
 
     earlier_chunks = rerank_chunks(
         question,
@@ -426,13 +438,14 @@ def compare_filings(conn, ticker: str, question: str,
         f"Question: {question}"
     )
 
-    answer_text = llm.complete(prompt, system=COMPARE_SYSTEM_PROMPT)
+    answer_text, generated = generate_answer(prompt, COMPARE_SYSTEM_PROMPT, combined)
     cited = extract_citation_ids(answer_text)
 
     return {
         "ticker": ticker,
         "question": question,
         "answer": answer_text,
+        "generated": generated,
         "earlier_filing": {
             "id": earlier["id"], "filing_type": earlier["filing_type"],
             "filing_date": earlier["filing_date"], "source_url": earlier["source_url"],

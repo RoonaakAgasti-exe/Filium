@@ -20,7 +20,6 @@ from wallet import ensure_wallet, get_portfolio
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
-
 def _load_portfolio(conn: PgConnection, user_id: int) -> dict:
     ensure_wallet(conn, user_id)
     conn.commit()
@@ -36,12 +35,10 @@ def _load_portfolio(conn: PgConnection, user_id: int) -> dict:
     prices = {ticker: q["price"] for ticker, q in quotes.items()}
     return get_portfolio(conn, user_id, prices)
 
-
 @router.get("", response_model=PortfolioResponse)
 def read_portfolio(user_id: int = Depends(get_current_user_id),
                    conn: PgConnection = Depends(get_conn)):
     return _load_portfolio(conn, user_id)
-
 
 @router.get("/history")
 def read_portfolio_history(user_id: int = Depends(get_current_user_id),
@@ -66,7 +63,6 @@ def read_portfolio_history(user_id: int = Depends(get_current_user_id),
         }
         for r in rows
     ]
-
 
 @router.get("/transactions")
 def read_transactions(limit: int = Query(default=20, ge=1, le=200),
@@ -106,7 +102,6 @@ def read_transactions(limit: int = Query(default=20, ge=1, le=200),
         for r in rows
     ]
 
-
 @router.get("/analytics")
 def read_analytics(user_id: int = Depends(get_current_user_id),
                    conn: PgConnection = Depends(get_conn)):
@@ -124,7 +119,6 @@ def read_analytics(user_id: int = Depends(get_current_user_id),
     result["cash_balance"] = portfolio["cash_balance"]
     result["holdings_value"] = portfolio["holdings_value"]
     return result
-
 
 @router.get("/vs-benchmark")
 def read_vs_benchmark(user_id: int = Depends(get_current_user_id),

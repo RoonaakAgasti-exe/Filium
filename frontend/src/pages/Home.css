@@ -18,8 +18,6 @@
   padding: 0 var(--space-1);
 }
 
-/* ---- "Cards" — dark VISA-style balance card + gradient buying-power card ---- */
-
 .cards-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -120,8 +118,6 @@
   background: var(--color-secondary-dim);
 }
 
-/* ---- quick actions row ---- */
-
 .quick-actions {
   display: flex;
   align-items: flex-start;
@@ -161,8 +157,6 @@
   font-size: 13.5px;
   box-shadow: var(--shadow-card);
 }
-
-/* ---- recent trades table ---- */
 
 .sales-table {
   width: 100%;
@@ -207,8 +201,6 @@
   color: var(--color-text-faint);
   text-transform: capitalize;
 }
-
-/* ---- Statistic donut card ---- */
 
 .range-select {
   border: 1px solid var(--color-border);
@@ -309,8 +301,6 @@
   font-weight: 700;
 }
 
-/* ---- watchlist quick-add ---- */
-
 .watch-input-row {
   display: flex;
   gap: var(--space-2);
@@ -328,8 +318,6 @@
   gap: 6px;
   margin-top: var(--space-3);
 }
-
-/* ---- quick trade modal ---- */
 
 .modal-overlay {
   position: fixed;

@@ -23,7 +23,6 @@ from datetime import date
 
 import analytics
 
-
 def _load_series(conn, ticker: str, start: date | None, end: date | None,
                  model_version_id: int | None) -> list[dict]:
     """Joins each trading day's close to that day's prediction, chronologically."""
@@ -75,9 +74,8 @@ def _load_series(conn, ticker: str, start: date | None, end: date | None,
         for r in rows
     ]
 
-
 def simulate(series: list[dict], starting_cash: float = 10000.0,
-             confidence_threshold: float = 0.5) -> dict:
+             confidence_threshold: float = 0.5, ticker: str = "") -> dict:
     """
     Pure simulation over an already-loaded series. Separated from the
     query so it can be unit tested against handmade data.
@@ -101,7 +99,6 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
             and today["confidence"] >= confidence_threshold
         )
 
-        # Day D's signal earns day D+1's return — never day D's own.
         day_return = (tomorrow["close"] - today["close"]) / today["close"] if today["close"] else 0.0
 
         if signal_is_up:
@@ -109,6 +106,10 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
             days_in_market += 1
             trades.append({
                 "date": str(today["date"]),
+                "action": "buy",
+                "ticker": ticker or "—",
+                "shares": 1,
+                "price": today["close"],
                 "entry_close": today["close"],
                 "exit_close": tomorrow["close"],
                 "return": day_return,
@@ -134,9 +135,6 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
     strategy_values = [starting_cash] + [c["strategy_value"] for c in curve]
     buy_hold_values = [starting_cash] + [c["buy_hold_value"] for c in curve]
 
-    # Daily returns across the whole window (0 on days out of the market),
-    # so Sharpe reflects the strategy actually followed rather than only
-    # its winning days.
     strategy_daily = analytics.daily_returns(strategy_values)
 
     wins = sum(1 for r in strategy_returns if r > 0)
@@ -160,11 +158,11 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
         "strategy_max_drawdown": strategy_drawdown["max_drawdown"] if strategy_drawdown else None,
         "buy_hold_max_drawdown": buy_hold_drawdown["max_drawdown"] if buy_hold_drawdown else None,
         "trade_count": len(trades),
+        "trades": trades,
         "winning_days": wins,
         "win_rate": (wins / len(strategy_returns)) if strategy_returns else None,
         "equity_curve": curve,
     }
-
 
 def run(conn, ticker: str, start: date | None = None, end: date | None = None,
         starting_cash: float = 10000.0, confidence_threshold: float = 0.5,
@@ -180,7 +178,7 @@ def run(conn, ticker: str, start: date | None = None, end: date | None = None,
                      f"Run: python ingestion/fetch_prices.py {ticker}",
         }
 
-    result = simulate(series, starting_cash, confidence_threshold)
+    result = simulate(series, starting_cash, confidence_threshold, ticker=ticker)
     result.update({
         "ticker": ticker,
         "start_date": str(series[0]["date"]),

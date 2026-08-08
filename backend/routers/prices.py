@@ -3,9 +3,9 @@ routers/prices.py — /prices endpoints.
 
 Serves real historical OHLCV data out of `price_history` (populated by
 `ingestion/fetch_prices.py`) so the frontend can chart actual price action
-instead of a synthetic line. `/latest` returns a live quote when Alpaca is
-configured and falls back to the most recent stored close otherwise, so
-the app still prices a portfolio with no brokerage keys at all.
+instead of a synthetic line. `/latest` returns the freshest quote any
+configured source can supply — see market_data for the fallback chain —
+so the app still prices a portfolio with a completely empty .env.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,7 +15,6 @@ import market_data
 from db import get_conn
 
 router = APIRouter(prefix="/prices", tags=["prices"])
-
 
 @router.get("/{ticker}")
 def get_price_history(ticker: str, days: int = Query(default=180, ge=1, le=1825),
@@ -45,7 +44,7 @@ def get_price_history(ticker: str, days: int = Query(default=180, ge=1, le=1825)
                    f"Run: python ingestion/fetch_prices.py {ticker}",
         )
 
-    rows = list(reversed(rows))  # chronological order for charting
+    rows = list(reversed(rows))
     return {
         "ticker": ticker,
         "candles": [
@@ -61,13 +60,13 @@ def get_price_history(ticker: str, days: int = Query(default=180, ge=1, le=1825)
         ],
     }
 
-
 @router.get("/{ticker}/latest")
 def get_latest_quote(ticker: str, conn: PgConnection = Depends(get_conn)):
     """
     Latest price with its provenance. `source` is 'alpaca' for a live
-    trade or 'price_history' for the last stored close — the UI labels
-    the two differently rather than passing a day-old close off as live.
+    trade, 'fmp'/'yahoo' for a delayed quote, or 'price_history' for the
+    last stored close — the UI labels them differently rather than
+    passing a day-old close off as live.
     """
     result = market_data.get_price(conn, ticker)
     return {"ticker": ticker.upper(), **result}

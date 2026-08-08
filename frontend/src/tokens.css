@@ -1,7 +1,4 @@
-/* Design tokens — light "fintech dashboard" theme: soft lavender-grey
-   background, white cards, a near-black sidebar/rail, and a blue brand
-   accent for active states and charts, with green/red reserved strictly
-   for gains/losses so money always reads unambiguously. */
+
 
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
@@ -16,18 +13,18 @@
   --color-border: #e6e9f2;
   --color-border-soft: #edeff7;
 
-  --color-ink: #14151a;         /* near-black used for sidebar / dark cards */
+  --color-ink: #14151a;
   --color-ink-raised: #1d1e25;
 
   --color-text: #14151a;
   --color-text-muted: #6b7080;
   --color-text-faint: #9298ab;
 
-  --color-accent: #4b6fff;       /* blue — brand / interactive / chart primary */
+  --color-accent: #4b6fff;
   --color-accent-dim: #2f4fd6;
   --color-accent-soft: rgba(75, 111, 255, 0.12);
 
-  --color-secondary: #16b98a;     /* mint green — brand secondary, chart contrast */
+  --color-secondary: #16b98a;
   --color-secondary-dim: #0f9370;
   --color-secondary-soft: rgba(22, 185, 138, 0.14);
 
@@ -134,8 +131,6 @@ input:focus, select:focus, button:focus-visible {
   }
 }
 
-/* ---- boot screen, shown for the instant it takes to mint/restore the guest paper account ---- */
-
 .boot-screen {
   height: 100vh;
   display: flex;
@@ -167,7 +162,46 @@ input:focus, select:focus, button:focus-visible {
   50% { opacity: 0.6; transform: scale(0.94); }
 }
 
-/* ---- shared card system, reused across Dashboard/Predictions/Portfolio ---- */
+.boot-screen h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--color-ink);
+}
+
+.boot-screen .boot-error {
+  max-width: 34rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-left: 3px solid var(--color-down, #c0392b);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.boot-screen:has(.boot-error) .boot-mark {
+  animation: none;
+}
+
+.boot-screen button {
+  padding: 8px 18px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boot-screen button:hover {
+  opacity: 0.88;
+}
 
 .card {
   background: var(--color-surface);
@@ -335,6 +369,26 @@ input:focus, select:focus, button:focus-visible {
   background: transparent;
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
+}
+
+.btn-secondary {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .form-error {

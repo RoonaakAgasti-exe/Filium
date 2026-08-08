@@ -30,7 +30,6 @@ logger = logging.getLogger("fincopilot.alerts")
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
-
 def _describe(rule_type: str, threshold: float | None) -> str:
     if rule_type == "prediction_flip":
         return "When the daily prediction flips direction"
@@ -43,7 +42,6 @@ def _describe(rule_type: str, threshold: float | None) -> str:
     if rule_type == "confidence_above":
         return f"When prediction confidence exceeds {threshold:.0%}"
     return rule_type
-
 
 def _serialise(row: tuple) -> dict:
     threshold = float(row[3]) if row[3] is not None else None
@@ -59,12 +57,10 @@ def _serialise(row: tuple) -> dict:
         "description": _describe(row[2], threshold),
     }
 
-
 _SELECT = (
     "SELECT id, ticker, rule_type, threshold, natural_language, is_active, "
     "       last_fired_at, created_at FROM alerts"
 )
-
 
 @router.get("/rule-types")
 def rule_types():
@@ -84,10 +80,10 @@ def rule_types():
             }
             for r in alerts_engine.RULE_TYPES
         ],
-        "natural_language_available": llm.is_configured(),
+        "natural_language_available": True,
+        "natural_language_uses_llm": llm.is_configured(),
         "email_delivery_configured": emailer.is_configured(),
     }
-
 
 @router.get("")
 def list_alerts(user_id: int = Depends(get_current_user_id),
@@ -99,7 +95,6 @@ def list_alerts(user_id: int = Depends(get_current_user_id),
     finally:
         cur.close()
     return [_serialise(r) for r in rows]
-
 
 def _create(conn: PgConnection, user_id: int, ticker: str, rule_type: str,
             threshold: float | None, natural_language: str | None) -> dict:
@@ -127,13 +122,11 @@ def _create(conn: PgConnection, user_id: int, ticker: str, rule_type: str,
 
     return _serialise(row)
 
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_alert(payload: AlertCreate, user_id: int = Depends(get_current_user_id),
                  conn: PgConnection = Depends(get_conn)):
     return _create(conn, user_id, payload.ticker.strip().upper(), payload.rule_type,
                    payload.threshold, None)
-
 
 @router.post("/natural", status_code=status.HTTP_201_CREATED)
 def create_alert_from_text(payload: NaturalLanguageAlertCreate,
@@ -145,14 +138,11 @@ def create_alert_from_text(payload: NaturalLanguageAlertCreate,
     The parsed interpretation comes back in the response so the user can
     confirm the rule means what they intended — an alert that silently
     means something else is worse than one that failed to be created.
-    """
-    if not llm.is_configured():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Natural-language alerts need OPENAI_API_KEY. Use the structured "
-                   "alert form instead — POST /alerts with a rule_type and threshold.",
-        )
 
+    Works without an LLM: alerts_engine falls back to a keyword parser
+    over the same five rule shapes, so this no longer 503s on a keyless
+    deployment. A phrasing it genuinely can't read still 422s.
+    """
     try:
         parsed = alerts_engine.parse_natural_language_alert(payload.text)
     except ValueError as exc:
@@ -162,7 +152,6 @@ def create_alert_from_text(payload: NaturalLanguageAlertCreate,
                     parsed["threshold"], payload.text)
     alert["interpreted_as"] = parsed["explanation"]
     return alert
-
 
 @router.patch("/{alert_id}")
 def update_alert(alert_id: int, is_active: bool = Body(embed=True),
@@ -188,7 +177,6 @@ def update_alert(alert_id: int, is_active: bool = Body(embed=True),
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
     return _serialise(row)
 
-
 @router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_alert(alert_id: int, user_id: int = Depends(get_current_user_id),
                  conn: PgConnection = Depends(get_conn)):
@@ -206,7 +194,6 @@ def delete_alert(alert_id: int, user_id: int = Depends(get_current_user_id),
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
 
-
 @router.post("/check")
 def check_alerts_now(force: bool = Query(default=True),
                      user_id: int = Depends(get_current_user_id),
@@ -220,7 +207,6 @@ def check_alerts_now(force: bool = Query(default=True),
     """
     fired = alerts_engine.evaluate_all_alerts(conn, user_id=user_id, force=force)
     return {"fired": fired, "count": len(fired)}
-
 
 @router.get("/events")
 def list_events(limit: int = Query(default=50, ge=1, le=200), unread_only: bool = False,
@@ -257,15 +243,22 @@ def list_events(limit: int = Query(default=50, ge=1, le=200), unread_only: bool 
         ],
     }
 
-
 @router.post("/events/read")
 def mark_events_read(event_ids: list[int] | None = Body(default=None, embed=True),
                      user_id: int = Depends(get_current_user_id),
                      conn: PgConnection = Depends(get_conn)):
-    """Marks the given events read, or all of them when `event_ids` is omitted."""
+    """
+    Marks the given events read, or all of them when `event_ids` is omitted.
+
+    An omitted key and an empty list are deliberately NOT the same thing.
+    `null`/absent means "mark everything", but `[]` means "mark these zero
+    events" — and conflating the two turns a client that computed an empty
+    selection into one that silently wipes the whole unread feed. That is
+    exactly what the previous `if event_ids:` did.
+    """
     cur = conn.cursor()
     try:
-        if event_ids:
+        if event_ids is not None:
             cur.execute(
                 "UPDATE alert_events SET is_read = TRUE WHERE user_id = %s AND id = ANY(%s)",
                 (user_id, event_ids),

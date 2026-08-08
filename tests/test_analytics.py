@@ -1,6 +1,5 @@
 """Tests for analytics.py pure functions."""
 import math
-import pytest
 
 from backend.analytics import (
     _stdev,

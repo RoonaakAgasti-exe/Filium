@@ -16,7 +16,6 @@ from models import SandboxRequest
 
 router = APIRouter(prefix="/sandbox", tags=["sandbox"])
 
-
 @router.post("/backtest")
 def run_backtest(payload: SandboxRequest, user_id: int = Depends(get_current_user_id),
                  conn: PgConnection = Depends(get_conn)):
@@ -29,7 +28,6 @@ def run_backtest(payload: SandboxRequest, user_id: int = Depends(get_current_use
         confidence_threshold=payload.confidence_threshold,
         model_version_id=payload.model_version_id,
     )
-
 
 @router.get("/available")
 def available_tickers(conn: PgConnection = Depends(get_conn)):

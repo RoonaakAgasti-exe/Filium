@@ -15,8 +15,10 @@ a shape and a threshold, not to emit code that later gets evaluated.
 """
 
 import logging
+import re
 from datetime import date, datetime, timezone
 
+import config
 import emailer
 
 logger = logging.getLogger("fincopilot.alerts")
@@ -36,12 +38,6 @@ RULE_DESCRIPTIONS = {
     "sentiment_above": "news sentiment rises above a threshold",
     "confidence_above": "prediction confidence exceeds a threshold",
 }
-
-
-# ---------------------------------------------------------------------
-# Data lookups
-# ---------------------------------------------------------------------
-
 
 def _latest_two_predictions(conn, ticker: str) -> list[dict]:
     cur = conn.cursor()
@@ -63,7 +59,6 @@ def _latest_two_predictions(conn, ticker: str) -> list[dict]:
     finally:
         cur.close()
 
-
 def _latest_two_closes(conn, ticker: str) -> list[dict]:
     cur = conn.cursor()
     try:
@@ -78,7 +73,6 @@ def _latest_two_closes(conn, ticker: str) -> list[dict]:
         return [{"date": r[0], "close": float(r[1])} for r in cur.fetchall()]
     finally:
         cur.close()
-
 
 def _latest_sentiment(conn, ticker: str) -> dict | None:
     cur = conn.cursor()
@@ -97,12 +91,6 @@ def _latest_sentiment(conn, ticker: str) -> dict | None:
     if row is None:
         return None
     return {"date": row[0], "score": float(row[1])}
-
-
-# ---------------------------------------------------------------------
-# Rule evaluation
-# ---------------------------------------------------------------------
-
 
 def evaluate_rule(conn, alert: dict) -> str | None:
     """
@@ -173,12 +161,6 @@ def evaluate_rule(conn, alert: dict) -> str | None:
     logger.warning("Unknown alert rule_type %r on alert %s", rule_type, alert.get("id"))
     return None
 
-
-# ---------------------------------------------------------------------
-# Firing + persistence
-# ---------------------------------------------------------------------
-
-
 def _already_fired_today(alert: dict, today: date) -> bool:
     last_fired = alert.get("last_fired_at")
     if last_fired is None:
@@ -186,7 +168,6 @@ def _already_fired_today(alert: dict, today: date) -> bool:
     if isinstance(last_fired, datetime):
         last_fired = last_fired.date()
     return last_fired >= today
-
 
 def record_event(conn, alert: dict, message: str, send_email: bool = True) -> dict:
     """Writes the alert_event, stamps last_fired_at, and optionally emails."""
@@ -208,10 +189,7 @@ def record_event(conn, alert: dict, message: str, send_email: bool = True) -> di
         if send_email and emailer.is_configured():
             cur.execute("SELECT email FROM users WHERE id = %s", (alert["user_id"],))
             row = cur.fetchone()
-            # Guest accounts use a synthetic @paper.fincopilot.local address
-            # that no mail server can deliver to — skip those rather than
-            # generating a bounce for every alert.
-            if row and row[0] and not row[0].endswith("@paper.fincopilot.local"):
+            if row and row[0] and not config.is_guest_email(row[0]):
                 emailed = emailer.send_alert_email(row[0], alert["ticker"], message)
                 if emailed:
                     cur.execute("UPDATE alert_events SET emailed = TRUE WHERE id = %s", (event_id,))
@@ -231,7 +209,6 @@ def record_event(conn, alert: dict, message: str, send_email: bool = True) -> di
         "created_at": created_at.isoformat(),
         "emailed": emailed,
     }
-
 
 def evaluate_all_alerts(conn, user_id: int | None = None, force: bool = False,
                         send_email: bool = True) -> list[dict]:
@@ -269,7 +246,6 @@ def evaluate_all_alerts(conn, user_id: int | None = None, force: bool = False,
         try:
             message = evaluate_rule(conn, alert)
         except Exception:
-            # One malformed rule must not stop the rest from being checked.
             logger.exception("Alert %s failed to evaluate", alert["id"])
             conn.rollback()
             continue
@@ -278,11 +254,6 @@ def evaluate_all_alerts(conn, user_id: int | None = None, force: bool = False,
             fired.append(record_event(conn, alert, message, send_email=send_email))
 
     return fired
-
-
-# ---------------------------------------------------------------------
-# Natural-language rule parsing (PDF: "Custom alerts via natural language")
-# ---------------------------------------------------------------------
 
 _NL_SYSTEM_PROMPT = """You convert a user's plain-English stock alert request into a
 structured rule. Respond with ONLY a JSON object.
@@ -307,20 +278,109 @@ If the request doesn't map cleanly onto one of these rule types, or no ticker is
 identifiable, set "understood" to false and explain why in "explanation".
 """
 
+_NOT_TICKERS = {
+    "A", "I", "IF", "IT", "IS", "IN", "ON", "AT", "TO", "BY", "OR", "AND", "THE", "ME",
+    "MY", "WHEN", "NOT", "US", "GO", "UP", "DO", "SO", "BE", "AN", "AS", "OF", "FOR",
+    "ANY", "ALL", "NEW", "LOW", "HIGH", "BUY", "SELL", "PCT", "USD", "AI", "CEO", "SEC",
+    "P", "E", "EPS", "ETF", "IPO", "YOY", "Q", "FY",
+}
+
+_TICKER_RE = re.compile(r"\$([A-Za-z]{1,5})\b|\b([A-Z]{1,5})\b")
+_NUMBER_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*(%?)")
+
+def _extract_ticker(text: str) -> str | None:
+    """First $TICKER, else the first all-caps token that isn't an English word."""
+    for match in _TICKER_RE.finditer(text):
+        dollar, bare = match.group(1), match.group(2)
+        if dollar:
+            return dollar.upper()
+        if bare and bare.upper() not in _NOT_TICKERS:
+            return bare.upper()
+    return None
+
+def parse_alert_text(text: str) -> dict:
+    """
+    Keyword parser for alert requests, used when no LLM is available.
+
+    The rule vocabulary is five fixed shapes, which is small enough to
+    match on directly — the LLM was always choosing from this same menu,
+    never writing anything that gets evaluated. So the keyless path loses
+    tolerance for unusual phrasing, not capability, and when the phrasing
+    is too unusual it raises rather than guessing.
+
+    Raises ValueError with a message naming what it could not work out.
+    """
+    lowered = text.lower()
+    ticker = _extract_ticker(text)
+    if not ticker:
+        raise ValueError(
+            "Could not identify a ticker in that request. Write it in capitals "
+            "or with a dollar sign, e.g. \"tell me if NVDA sentiment turns negative\"."
+        )
+
+    numbers = [(float(n), bool(pct)) for n, pct in _NUMBER_RE.findall(text)]
+
+    def first_number(default=None, *, as_fraction=False):
+        for value, is_pct in numbers:
+            return value / 100 if (as_fraction and (is_pct or value > 1)) else value
+        return default
+
+    if any(w in lowered for w in ("flip", "flips", "reverse", "changes direction",
+                                  "change direction", "switches")):
+        return {"ticker": ticker, "rule_type": "prediction_flip", "threshold": None,
+                "explanation": f"Alert when {ticker}'s daily prediction flips direction."}
+
+    if "sentiment" in lowered:
+        negative = any(w in lowered for w in ("negative", "below", "drops", "falls", "worse", "sours"))
+        rule_type = "sentiment_below" if negative else "sentiment_above"
+        threshold = first_number(0.0)
+        return {"ticker": ticker, "rule_type": rule_type, "threshold": float(threshold),
+                "explanation": (
+                    f"Alert when {ticker}'s news sentiment "
+                    f"{'falls below' if negative else 'rises above'} {threshold:+.2f}.")}
+
+    if "confidence" in lowered:
+        threshold = first_number(as_fraction=True)
+        if threshold is None:
+            raise ValueError("A confidence alert needs a threshold, e.g. \"above 80%\".")
+        return {"ticker": ticker, "rule_type": "confidence_above", "threshold": float(threshold),
+                "explanation": f"Alert when {ticker}'s prediction confidence exceeds {threshold:.0%}."}
+
+    if any(w in lowered for w in ("move", "moves", "%", "percent", "price", "drop", "rise",
+                                 "gain", "fall", "jump")):
+        threshold = first_number()
+        if threshold is None:
+            raise ValueError("A price-move alert needs a percentage, e.g. \"more than 5%\".")
+        return {"ticker": ticker, "rule_type": "price_move", "threshold": abs(float(threshold)),
+                "explanation": f"Alert when {ticker} moves more than {abs(threshold):g}% in a day."}
+
+    raise ValueError(
+        "Could not map that request onto a supported alert. Supported: prediction "
+        "flips, price moves by a percentage, news sentiment above/below a level, and "
+        "prediction confidence above a level."
+    )
 
 def parse_natural_language_alert(text: str) -> dict:
     """
     Turns "notify me if NVDA's sentiment turns negative" into
     {ticker: NVDA, rule_type: sentiment_below, threshold: 0}.
 
-    Raises LLMUnavailable when OpenAI isn't configured — the caller
-    surfaces that as a 503 telling the user to use the structured form
-    instead, rather than silently creating a rule that means something
-    different from what they asked for.
+    Uses the LLM when one is configured, because it handles phrasing the
+    keyword parser will not. Falls back to `parse_alert_text` otherwise,
+    so the feature degrades to stricter phrasing rather than to a 503 —
+    which is what it used to do on any deployment without a key, or with a
+    key that had run out of credit.
     """
-    import llm  # local import so this module stays importable without the openai package
+    import llm
 
-    result = llm.complete_json(f"Alert request: {text}", system=_NL_SYSTEM_PROMPT)
+    if not llm.is_configured():
+        return parse_alert_text(text)
+
+    try:
+        result = llm.complete_json(f"Alert request: {text}", system=_NL_SYSTEM_PROMPT)
+    except llm.LLMUnavailable as exc:
+        logger.info("Parsing alert text without the LLM: %s", exc)
+        return parse_alert_text(text)
 
     if not result.get("understood"):
         raise ValueError(

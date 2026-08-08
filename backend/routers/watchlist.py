@@ -10,7 +10,6 @@ from models import WatchlistAdd, WatchlistItem
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
-
 @router.get("", response_model=list[WatchlistItem])
 def get_watchlist(user_id: int = Depends(get_current_user_id),
                   conn: PgConnection = Depends(get_conn)):
@@ -24,7 +23,6 @@ def get_watchlist(user_id: int = Depends(get_current_user_id),
     finally:
         cur.close()
     return [WatchlistItem(ticker=r[0], added_at=r[1]) for r in rows]
-
 
 @router.get("/detailed")
 def get_watchlist_detailed(user_id: int = Depends(get_current_user_id),
@@ -70,7 +68,6 @@ def get_watchlist_detailed(user_id: int = Depends(get_current_user_id),
         for r in rows
     ]
 
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 def add_to_watchlist(payload: WatchlistAdd, user_id: int = Depends(get_current_user_id),
                      conn: PgConnection = Depends(get_conn)):
@@ -99,7 +96,6 @@ def add_to_watchlist(payload: WatchlistAdd, user_id: int = Depends(get_current_u
         cur.close()
 
     return {"message": f"{ticker} added to watchlist", "ticker": ticker}
-
 
 @router.delete("/{ticker}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_from_watchlist(ticker: str, user_id: int = Depends(get_current_user_id),

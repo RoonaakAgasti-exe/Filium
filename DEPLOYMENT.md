@@ -43,7 +43,7 @@ deletes all data, so only do this in development).
 **Upgrading an existing database:** `schema.sql` is the current shape,
 not a patch — re-running it against a populated database won't add
 columns to tables that already exist. Files in `db/migrations/` handle
-that, in numeric order, and each is safe to run more than once:
+that, in numeric order:
 ```bash
 for f in db/migrations/*.sql; do
   docker compose exec -T db psql -U postgres -d fincopilot < "$f"
@@ -52,6 +52,44 @@ done
 Skipping these is the usual cause of an `UndefinedColumn` error from the
 backend or the daily jobs against a database that was created before the
 column existed.
+
+Most of these migrations are additive (they add a column). `005` is the
+exception: it *replaces* a CHECK constraint on `predictions` that never
+constrained anything, because it was written `IN ('up','down',NULL)` and a
+NULL inside an `IN` list makes the whole expression evaluate to NULL for a
+bad value — which a CHECK accepts. Applying it is safe and idempotent on a
+populated database; if the `ALTER` fails, that means a bad value is already
+stored, and the error names the row so you can decide what to do with it.
+
+**Changing embedding provider** (`EMBEDDING_PROVIDER` in `.env`) needs no
+SQL. The vector column's width belongs to whichever model embedded the
+corpus, so `ingestion/chunk_and_embed.py` sets it to match the active
+model — but only while `filing_chunks` is empty, where that is free. A
+fresh clone with no OpenAI key therefore just works: the schema ships at
+OpenAI's 1536, and the first keyless ingestion narrows it to the local
+model's 384.
+
+Switching provider on a database that already holds chunks is the one
+case that costs something, because the existing vectors cannot be
+converted — they have to be recomputed:
+
+```bash
+docker compose exec -T db psql -U postgres -d fincopilot -c "TRUNCATE filing_chunks;"
+python ingestion/ingest_filing.py AAPL MSFT
+```
+
+Until you do, the app will not silently mix the two. If the configured
+model and the model that embedded the corpus disagree, `/query` returns
+409 naming both and telling you how to reconcile them, rather than
+returning rankings computed from incomparable vectors.
+
+`/health` reports the live half of that comparison under `embeddings`
+(`provider`, `model`, `dimension`), so you can check what would embed a
+query today without running one. Note it reports the model actually in
+use, which is not always what `EMBEDDING_PROVIDER` says: `auto` resolves
+against whether a key is set, and a value that isn't `auto`, `openai` or
+`local` falls back rather than being honoured — so a typo shows up here
+as `local`, not as the typo.
 
 **Another gotcha:** the frontend bakes `VITE_API_BASE_URL` in at *build*
 time, not runtime (this is how Vite works — see the comment in

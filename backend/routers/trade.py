@@ -22,40 +22,43 @@ logger = logging.getLogger("fincopilot.trade")
 
 router = APIRouter(prefix="/trade", tags=["trade"])
 
-
 def _execute(conn: PgConnection, user_id: int, payload: TradeRequest, action: str) -> dict:
     ticker = payload.ticker.strip().upper()
-
-    # Create the companies row before the trade, not after: `transactions`
-    # and `holdings` both have a foreign key onto it, and a violation
-    # aborts the transaction with an opaque 500.
-    market_data.ensure_company(conn, ticker)
-    ensure_wallet(conn, user_id)
-    conn.commit()
 
     quote = market_data.get_price(conn, ticker)
     price = quote["price"]
 
     try:
+        market_data.ensure_company(conn, ticker)
+        ensure_wallet(conn, user_id)
+
         if action == "buy":
             result = buy_shares(conn, user_id, ticker, payload.shares, price,
                                 payload.triggered_by_prediction)
         else:
             result = sell_shares(conn, user_id, ticker, payload.shares, price,
                                  payload.triggered_by_prediction)
-    except (InsufficientFundsError, InsufficientSharesError) as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
-    explanation = None
-    if payload.explain:
-        try:
-            explanation = explain.explain_trade(
-                conn, result["transaction_id"], action, ticker,
-                payload.shares, price, payload.triggered_by_prediction,
-            )
-        except Exception:
-            # The trade is committed. An explanation failure is cosmetic.
-            logger.exception("Trade explanation failed for transaction %s", result["transaction_id"])
+        explanation = None
+        if payload.explain:
+            try:
+                explanation = explain.explain_trade(
+                    conn, result["transaction_id"], action, ticker,
+                    payload.shares, price, payload.triggered_by_prediction,
+                )
+            except Exception:
+                logger.exception("Trade explanation failed for transaction %s", result["transaction_id"])
+
+        conn.commit()
+    except (InsufficientFundsError, InsufficientSharesError) as exc:
+        conn.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except market_data.PriceUnavailable:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
 
     return {
         "executed_price": price,
@@ -64,18 +67,15 @@ def _execute(conn: PgConnection, user_id: int, payload: TradeRequest, action: st
         **result,
     }
 
-
 @router.post("/buy", response_model=TradeResponse, status_code=status.HTTP_201_CREATED)
 def buy(payload: TradeRequest, user_id: int = Depends(get_current_user_id),
         conn: PgConnection = Depends(get_conn)):
     return _execute(conn, user_id, payload, "buy")
 
-
 @router.post("/sell", response_model=TradeResponse, status_code=status.HTTP_201_CREATED)
 def sell(payload: TradeRequest, user_id: int = Depends(get_current_user_id),
          conn: PgConnection = Depends(get_conn)):
     return _execute(conn, user_id, payload, "sell")
-
 
 @router.get("/explanation/{transaction_id}")
 def get_explanation(transaction_id: int, user_id: int = Depends(get_current_user_id),

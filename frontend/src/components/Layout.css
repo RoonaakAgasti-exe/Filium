@@ -95,8 +95,6 @@
   gap: var(--space-3);
 }
 
-/* ---- shared topbar, used at the top of every page ---- */
-
 .topbar {
   display: flex;
   align-items: center;

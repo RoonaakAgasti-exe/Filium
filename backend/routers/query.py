@@ -22,7 +22,6 @@ logger = logging.getLogger("fincopilot.query")
 
 router = APIRouter(prefix="/query", tags=["query"])
 
-
 def _log_query(conn: PgConnection, user_id: int, question: str, result: dict) -> None:
     """
     Records the exchange. Deliberately non-fatal: the user already has
@@ -44,14 +43,12 @@ def _log_query(conn: PgConnection, user_id: int, question: str, result: dict) ->
         logger.exception("Failed to record query history for user %s", user_id)
         conn.rollback()
 
-
 @router.post("", response_model=QueryResponse)
 def ask_question(payload: QueryRequest, user_id: int = Depends(get_current_user_id),
                  conn: PgConnection = Depends(get_conn)):
     result = rag.answer_query(conn, payload.question, payload.ticker)
     _log_query(conn, user_id, payload.question, result)
     return result
-
 
 @router.post("/peer")
 def ask_peer_question(payload: PeerQueryRequest, user_id: int = Depends(get_current_user_id),
@@ -64,7 +61,6 @@ def ask_peer_question(payload: PeerQueryRequest, user_id: int = Depends(get_curr
     result = rag.answer_peer_query(conn, payload.question, payload.tickers)
     _log_query(conn, user_id, payload.question, result)
     return result
-
 
 @router.post("/compare")
 def compare_filings(payload: CompareFilingsRequest, user_id: int = Depends(get_current_user_id),
@@ -83,12 +79,10 @@ def compare_filings(payload: CompareFilingsRequest, user_id: int = Depends(get_c
     _log_query(conn, user_id, payload.question, result)
     return result
 
-
 @router.get("/filings/{ticker}")
 def list_filings(ticker: str, conn: PgConnection = Depends(get_conn)):
     """Ingested filings for a ticker — powers the comparison date pickers."""
     return {"ticker": ticker.upper(), "filings": rag.list_filings(conn, ticker)}
-
 
 @router.get("/history")
 def query_history(limit: int = 20, user_id: int = Depends(get_current_user_id),

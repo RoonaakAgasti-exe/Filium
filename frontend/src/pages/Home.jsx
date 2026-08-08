@@ -29,8 +29,6 @@ function timeAgo(dateStr) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
-// deterministic, cosmetic-only "paper account" digits derived from the
-// user's email — this is a simulated account, never a real one.
 function fakeAcctDigits(email) {
   let h = 0;
   for (const c of email || 'paper') h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -46,7 +44,7 @@ export default function Home() {
   const [watchInput, setWatchInput] = useState('');
   const [watchBusy, setWatchBusy] = useState(false);
   const [watchError, setWatchError] = useState('');
-  const [statRange, setStatRange] = useState('week'); // week | month | all
+  const [statRange, setStatRange] = useState('week');
   const [autoInvest, setAutoInvest] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
   const [tradeTicker, setTradeTicker] = useState('');
@@ -73,7 +71,7 @@ export default function Home() {
     loadAll();
     const saved = localStorage.getItem(AUTO_INVEST_KEY);
     if (saved) {
-      try { setAutoInvest(Boolean(JSON.parse(saved).enabled)); } catch { /* ignore */ }
+      try { setAutoInvest(Boolean(JSON.parse(saved).enabled)); } catch {  }
     }
   }, []);
 
@@ -83,7 +81,7 @@ export default function Home() {
   function toggleAutoInvest() {
     const saved = localStorage.getItem(AUTO_INVEST_KEY);
     let parsed = { enabled: false, threshold: 75 };
-    try { if (saved) parsed = JSON.parse(saved); } catch { /* ignore */ }
+    try { if (saved) parsed = JSON.parse(saved); } catch {  }
     const next = { ...parsed, enabled: !autoInvest };
     setAutoInvest(next.enabled);
     localStorage.setItem(AUTO_INVEST_KEY, JSON.stringify(next));

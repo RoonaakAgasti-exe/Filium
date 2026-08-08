@@ -1,13 +1,29 @@
 """
 answer_query.py
 
-The core RAG loop:
-1. Embed the user's question
-2. Retrieve the most relevant filing chunks via pgvector cosine similarity
-3. (Optional) rerank with a cross-encoder for better precision
-4. Hand the retrieved chunks + question to an LLM, forcing it to answer
-   only from what was retrieved and to cite which chunk(s) it used
-5. Map the LLM's citation markers back to real chunk IDs + source filings
+CLI front end for the RAG pipeline, and the import surface the eval
+harness uses.
+
+This file used to be a second, independent implementation of the whole
+pipeline — its own embedding call, its own retrieval SQL, its own prompt,
+its own citation parsing — sitting alongside `backend/rag.py`. Two copies
+of a retrieval pipeline is a bad idea generally, but it became an actual
+bug once embeddings stopped being OpenAI-only: `backend/embeddings.py`
+now defaults to a local 384-dimension model when no OpenAI key is set, so
+a corpus ingested with the default config could only be queried by code
+that went through that module. This file didn't, so it embedded questions
+as 1536-dimension OpenAI vectors and every query — including the entire
+eval harness, which imports from here — died inside pgvector with
+`expected 384 dimensions, not 1536`.
+
+So it is now what rag.py's docstring always claimed it was: a thin
+wrapper. The pipeline being measured by eval/ is the pipeline being
+served by the API, and there is one place that decides which embedding
+model runs.
+
+The function signatures below are kept exactly as they were, including
+the unused `client` argument, because eval/judge_faithfulness.py and
+eval/label_retrieval.py call them positionally.
 
 Usage:
     python answer_query.py "What did Apple say about supply chain risk?" --ticker AAPL
@@ -15,169 +31,81 @@ Usage:
 
 import argparse
 import os
-import re
+import sys
+from pathlib import Path
 
 import psycopg2
 from dotenv import load_dotenv
-from openai import OpenAI
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+
+import embeddings  # noqa: E402
+import rag  # noqa: E402
 
 load_dotenv()
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/fincopilot")
-EMBEDDING_MODEL = "text-embedding-3-small"
-LLM_MODEL = "gpt-4o-mini"
-TOP_K_RETRIEVE = 8   # how many chunks to pull from the DB before reranking
-TOP_K_FINAL = 4      # how many chunks actually go into the LLM prompt
 
-SYSTEM_PROMPT = """You are a financial research assistant. You will be given
-excerpts from a company's SEC filing, each labeled with a source number like [1], [2].
-
-Rules:
-- Answer ONLY using information present in the excerpts below.
-- If the excerpts don't contain the answer, say so plainly — do not guess or use outside knowledge.
-- Every claim you make must end with the source number(s) it came from, like this: "...impacted margins [2]."
-- Keep the answer concise and directly responsive to the question.
-"""
+# Re-exported from rag so eval/ measures the same depth the API serves.
+TOP_K_RETRIEVE = rag.TOP_K_RETRIEVE
+TOP_K_FINAL = rag.TOP_K_FINAL
 
 
-def embed_query(client: OpenAI, query: str) -> list[float]:
-    response = client.embeddings.create(model=EMBEDDING_MODEL, input=[query])
-    return response.data[0].embedding
-
-
-def retrieve_chunks(conn, query_embedding: list[float], ticker: str | None, top_k: int) -> list[dict]:
+def embed_query(client, query: str) -> list[float]:
     """
-    Exact cosine-similarity search over filing_chunks, optionally scoped to
-    one ticker. Note: no ivfflat index is assumed here — see the note in
-    schema.sql about why that index is deliberately deferred until the
-    table has real volume. Exact search is correct and fast enough at
-    this project's data scale.
+    Embeds a question.
+
+    `client` is ignored — the provider is chosen by backend/embeddings.py,
+    which may not be OpenAI at all. It stays in the signature because the
+    eval scripts pass one positionally, and because the alternative
+    (editing both to drop it) would make this change bigger than the bug
+    it fixes.
     """
-    cur = conn.cursor()
+    return embeddings.embed_query(query)
 
-    if ticker:
-        cur.execute(
-            """
-            SELECT fc.id, fc.chunk_text, fc.section_label, f.ticker, f.filing_type,
-                   f.filing_date, f.source_url, fc.embedding <=> %s::vector AS distance
-            FROM filing_chunks fc
-            JOIN filings f ON f.id = fc.filing_id
-            WHERE f.ticker = %s
-            ORDER BY distance
-            LIMIT %s
-            """,
-            (query_embedding, ticker, top_k),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT fc.id, fc.chunk_text, fc.section_label, f.ticker, f.filing_type,
-                   f.filing_date, f.source_url, fc.embedding <=> %s::vector AS distance
-            FROM filing_chunks fc
-            JOIN filings f ON f.id = fc.filing_id
-            ORDER BY distance
-            LIMIT %s
-            """,
-            (query_embedding, top_k),
-        )
 
-    columns = ["chunk_id", "chunk_text", "section_label", "ticker", "filing_type",
-               "filing_date", "source_url", "distance"]
-    rows = cur.fetchall()
-    cur.close()
+def retrieve_chunks(conn, query_embedding: list[float], ticker: str | None,
+                    top_k: int) -> list[dict]:
+    """
+    Vector search, delegated to rag.
 
-    return [dict(zip(columns, row)) for row in rows]
+    Note the ticker argument is a single string here but a list in rag —
+    that difference is the reason this shim exists rather than eval
+    importing rag directly.
+    """
+    chunks = rag.retrieve_chunks(
+        conn, query_embedding, [ticker] if ticker else None, top_k
+    )
+    return rag._normalise(chunks)
 
 
 def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
-    """
-    Optional cross-encoder reranking step. Cross-encoders score a
-    (query, chunk) pair jointly rather than comparing precomputed vectors,
-    which usually gives noticeably better precision than raw embedding
-    similarity — at the cost of being slower, so it only runs on the
-    already-narrowed candidate set from retrieve_chunks, not the whole table.
-
-    Requires: pip install sentence-transformers
-    Falls back to the embedding-similarity order if the reranker isn't
-    installed, so the pipeline still works without it.
-    """
-    try:
-        from sentence_transformers import CrossEncoder
-    except ImportError:
-        print("  [rerank skipped: sentence-transformers not installed]")
-        return chunks[:top_k]
-
-    model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-    pairs = [(query, c["chunk_text"]) for c in chunks]
-    scores = model.predict(pairs)
-
-    scored = sorted(zip(chunks, scores), key=lambda x: x[1], reverse=True)
-    return [c for c, _ in scored[:top_k]]
+    return rag.rerank_chunks(query, chunks, top_k)
 
 
 def build_prompt(query: str, chunks: list[dict]) -> str:
-    excerpt_blocks = []
-    for i, c in enumerate(chunks, start=1):
-        excerpt_blocks.append(
-            f"[{i}] (from {c['ticker']} {c['filing_type']}, {c['filing_date']}, "
-            f"section: {c['section_label']})\n{c['chunk_text']}"
-        )
-
-    excerpts_text = "\n\n".join(excerpt_blocks)
-    return f"Excerpts:\n\n{excerpts_text}\n\nQuestion: {query}"
+    return rag.build_prompt(query, chunks)
 
 
 def extract_citation_ids(answer_text: str) -> set[int]:
-    """Pulls out every [N] marker the LLM used, e.g. '[1]' and '[2, 3]'."""
-    matches = re.findall(r"\[(\d+(?:,\s*\d+)*)\]", answer_text)
-    ids = set()
-    for m in matches:
-        for part in m.split(","):
-            ids.add(int(part.strip()))
-    return ids
+    return rag.extract_citation_ids(answer_text)
 
 
 def answer_query(query: str, ticker: str | None = None) -> dict:
-    client = OpenAI()
+    """
+    Answers one question, opening and closing its own connection.
+
+    Returns rag's response shape, which includes `generated` — False when
+    no LLM was configured and `answer` holds the retrieved passages rather
+    than written prose. Callers that score answer quality should check it;
+    scoring extractive output as though a model wrote it measures nothing.
+    """
     conn = psycopg2.connect(DB_URL)
-
     try:
-        query_embedding = embed_query(client, query)
-        candidates = retrieve_chunks(conn, query_embedding, ticker, TOP_K_RETRIEVE)
-
-        if not candidates:
-            return {"answer": "No filing data found for this query.", "sources": []}
-
-        top_chunks = rerank_chunks(query, candidates, TOP_K_FINAL)
-        prompt = build_prompt(query, top_chunks)
-
-        response = client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0,
-        )
-        answer_text = response.choices[0].message.content
-
-        cited_ids = extract_citation_ids(answer_text)
-        sources = [
-            {
-                "marker": i,
-                "ticker": c["ticker"],
-                "filing_type": c["filing_type"],
-                "filing_date": str(c["filing_date"]),
-                "section": c["section_label"],
-                "source_url": c["source_url"],
-                "chunk_id": c["chunk_id"],
-            }
-            for i, c in enumerate(top_chunks, start=1)
-            if i in cited_ids
-        ]
-
-        return {"answer": answer_text, "sources": sources}
-
+        return rag.answer_query(conn, query, ticker)
+    except rag.NoDataError as exc:
+        # The CLI predates the exception and its callers expect a dict.
+        return {"answer": str(exc), "sources": [], "all_sources": [], "generated": False}
     finally:
         conn.close()
 
@@ -192,7 +120,9 @@ if __name__ == "__main__":
 
     print("\n--- Answer ---")
     print(result["answer"])
+    if not result.get("generated", True):
+        print("\n(No answer-writing model configured — the above is retrieved "
+              "evidence, not a generated answer.)")
     print("\n--- Sources ---")
     for s in result["sources"]:
         print(f"  [{s['marker']}] {s['ticker']} {s['filing_type']} ({s['filing_date']}) — {s['section']}")
-        print(f"      {s['source_url']}")

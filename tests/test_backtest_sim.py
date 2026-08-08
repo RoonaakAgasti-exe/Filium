@@ -1,6 +1,4 @@
 """Tests for backtest_sim.py pure functions."""
-import pytest
-
 from backend.backtest_sim import simulate
 
 

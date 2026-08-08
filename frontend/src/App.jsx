@@ -12,14 +12,17 @@ import PublicTicker from './pages/PublicTicker';
 import { ensureSession } from './api/client';
 import './tokens.css';
 
-// No login/signup screen: every visitor gets a silent, standing "paper
-// account" the moment the app loads (see ensureSession in api/client.js).
-// We just wait for that one-time handshake before mounting the routes.
 export default function App() {
   const [ready, setReady] = useState(false);
+  const [bootError, setBootError] = useState(null);
 
   useEffect(() => {
-    ensureSession().finally(() => setReady(true));
+    let cancelled = false;
+    ensureSession()
+      .then(() => { if (!cancelled) setBootError(null); })
+      .catch((err) => { if (!cancelled) setBootError(err.message || String(err)); })
+      .finally(() => { if (!cancelled) setReady(true); });
+    return () => { cancelled = true; };
   }, []);
 
   if (!ready) {
@@ -27,6 +30,23 @@ export default function App() {
       <div className="boot-screen">
         <div className="boot-mark">FC</div>
         <p>Setting up your paper account…</p>
+      </div>
+    );
+  }
+
+  if (bootError) {
+    return (
+      <div className="boot-screen">
+        <div className="boot-mark">FC</div>
+        <h2>Couldn’t set up your paper account</h2>
+        <p className="boot-error">{bootError}</p>
+        <p>
+          The API may still be starting. Check that the backend is reachable at{' '}
+          <code>/health</code>, then retry.
+        </p>
+        <button type="button" onClick={() => window.location.reload()}>
+          Retry
+        </button>
       </div>
     );
   }

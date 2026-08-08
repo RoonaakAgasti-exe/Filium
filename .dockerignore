@@ -1,19 +1,8 @@
-# The backend and scheduler images build from the REPO ROOT (they need
-# both their own directory and ingestion/), so this file — not
-# backend/.dockerignore — is what trims their build context.
-#
-# Without it every build ships frontend/node_modules and the local .env
-# into the daemon: slow, and a good way to leak keys into an image layer.
-
 .git
 .github
-
-# Secrets — these come from the runtime environment, never the image.
 .env
 .env.local
 .env.*.local
-
-# Python
 __pycache__
 *.py[cod]
 .venv
@@ -21,12 +10,7 @@ venv
 .pytest_cache
 .coverage
 coverage.xml
-
-# The frontend is a separate image built from ./frontend; none of it
-# belongs in the backend or scheduler context.
 frontend
-
-# Docs and local scratch — nothing in the images reads these.
 *.md
 *.pdf
 .idea

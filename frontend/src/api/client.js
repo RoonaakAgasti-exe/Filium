@@ -1,11 +1,3 @@
-// Defaults to the same-origin /api path that nginx.conf proxies to the
-// backend. Hardcoding http://localhost:8000 here worked only for someone
-// sitting on the Docker host — for every other visitor "localhost" is
-// their own machine, and the browser blocks it as cross-origin besides.
-//
-// `npm run dev` has no nginx in front of it, so vite.config.js proxies
-// /api to the backend for the dev server. Set VITE_API_BASE_URL only
-// when the backend is genuinely on a different host.
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 function getToken() {
@@ -26,11 +18,17 @@ async function request(path, options = {}) {
     let detail = res.statusText;
     try {
       const body = await res.json();
-      detail = body.detail || detail;
+      if (Array.isArray(body.detail)) {
+        detail = body.detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+      } else if (body.detail) {
+        detail = body.detail;
+      }
     } catch {
-      /* response wasn't JSON — fall back to statusText */
+
     }
-    throw new Error(detail);
+    const error = new Error(detail);
+    error.status = res.status;
+    throw error;
   }
 
   if (res.status === 204) return null;
@@ -48,6 +46,8 @@ export const api = {
 
   getPrediction: (ticker) => request(`/predictions/${ticker}`),
   getBacktest: (ticker) => request(`/predictions/${ticker}/backtest`),
+  getCalibration: (ticker, bins = 5) =>
+    request(`/predictions/${ticker}/calibration?bins=${bins}`),
   getPredictionHistory: (ticker, limit = 30) => request(`/predictions/${ticker}/history?limit=${limit}`),
 
   getPriceHistory: (ticker, days = 180) => request(`/prices/${ticker}?days=${days}`),
@@ -60,8 +60,20 @@ export const api = {
 
   getPortfolio: () => request('/portfolio'),
   getPortfolioHistory: () => request('/portfolio/history'),
+  getPortfolioAnalytics: () => request('/portfolio/analytics'),
   getBenchmarkComparison: () => request('/portfolio/vs-benchmark'),
   getTransactions: (limit = 20) => request(`/portfolio/transactions?limit=${limit}`),
+  depositCash: (amount, mode = 'add') =>
+    request('/wallet/deposit', {
+      method: 'POST',
+      body: JSON.stringify({ amount, mode }),
+    }),
+  resetCash: () =>
+    request('/wallet/deposit', {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'set' }),
+    }),
+  getCompany: (ticker) => request(`/companies/${ticker}`),
   buy: (ticker, shares, triggeredByPrediction = false) =>
     request('/trade/buy', {
       method: 'POST',
@@ -73,7 +85,6 @@ export const api = {
       body: JSON.stringify({ ticker, shares, triggered_by_prediction: triggeredByPrediction }),
     }),
 
-  // Alerts
   getAlerts: () => request('/alerts'),
   createAlert: (payload) =>
     request('/alerts', { method: 'POST', body: JSON.stringify(payload) }),
@@ -84,30 +95,28 @@ export const api = {
   deleteAlert: (id) => request(`/alerts/${id}`, { method: 'DELETE' }),
   checkAlerts: () => request('/alerts/check', { method: 'POST' }),
   getAlertEvents: () => request('/alerts/events'),
-  markAlertEventsRead: (ids) =>
-    request('/alerts/events/read', { method: 'POST', body: JSON.stringify({ ids }) }),
+  markAlertEventsRead: (eventIds) =>
+    request('/alerts/events/read', {
+      method: 'POST',
+      body: JSON.stringify({ event_ids: eventIds }),
+    }),
   getAlertRuleTypes: () => request('/alerts/rule-types'),
 
-  // Sandbox
   getSandboxAvailable: () => request('/sandbox/available'),
   runSandboxBacktest: (payload) =>
     request('/sandbox/backtest', { method: 'POST', body: JSON.stringify(payload) }),
 
-  // Leaderboard / models
   getPredictionModels: () => request('/predictions/models'),
   getLeaderboard: (ticker) =>
     request(ticker ? `/predictions/leaderboard?ticker=${ticker}` : '/predictions/leaderboard'),
 
-  // Public pages
   getPublicTickers: () => request('/public/tickers'),
   getPublicTicker: (ticker) => request(`/public/${ticker}`),
 
-  // News / sentiment
   getNews: (ticker, limit = 30) => request(`/news/${ticker}?limit=${limit}`),
   getSentimentTimeline: (ticker, days = 90) =>
     request(`/news/${ticker}/sentiment-timeline?days=${days}`),
 
-  // Query extras
   askPeerQuestion: (question, tickers) =>
     request('/query/peer', { method: 'POST', body: JSON.stringify({ question, tickers }) }),
   compareFilings: (payload) =>
@@ -139,15 +148,9 @@ export function getUserEmail() {
   }
 }
 
-// --- Guest session -----------------------------------------------------
-// There is no login/signup screen in this app: instead we keep a
-// standing "paper account" per browser. The first time someone visits,
-// we mint a random guest identity and register + log it in against the
-// real /auth endpoints, then remember the credentials in localStorage so
-// the same guest account (and its trade history) is reused on return
-// visits — all silently, with no form for the person to fill in.
-
 const GUEST_KEY = 'fincopilot_guest_id';
+
+const GUEST_EMAIL_DOMAIN = 'paper.fincopilot.app';
 
 function getOrCreateGuestId() {
   let id = localStorage.getItem(GUEST_KEY);
@@ -158,11 +161,6 @@ function getOrCreateGuestId() {
   return id;
 }
 
-/**
- * Ensures a valid auth token exists, minting a fresh guest account if
- * needed. Pass `fresh: true` to abandon the current guest and start a
- * brand-new paper account (used by the "Reset paper account" action).
- */
 export async function ensureSession({ fresh = false } = {}) {
   if (!fresh && isLoggedIn()) return;
 
@@ -172,15 +170,19 @@ export async function ensureSession({ fresh = false } = {}) {
   }
 
   const guestId = getOrCreateGuestId();
-  const email = `${guestId}@paper.fincopilot.local`;
-  const password = `${guestId}-pw-9x`; // deterministic per-guest, never shown to the user
+  const email = `${guestId}@${GUEST_EMAIL_DOMAIN}`;
+  const password = `${guestId}-pw-9x`;
 
+  let result;
   try {
-    const result = await api.register(email, password);
-    setToken(result.access_token);
-  } catch {
-    // already registered (returning visitor) — just log in
-    const result = await api.login(email, password);
-    setToken(result.access_token);
+    result = await api.register(email, password);
+  } catch (err) {
+    if (err.status !== 409) throw err;
+    result = await api.login(email, password);
   }
+
+  if (!result?.access_token) {
+    throw new Error('Auth succeeded but returned no access token');
+  }
+  setToken(result.access_token);
 }

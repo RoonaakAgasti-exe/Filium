@@ -10,8 +10,9 @@ order:
     3. score sentiment — FinBERT over anything unscored
     4. backtest       — resolve every prediction whose outcome bar now exists
     5. predict        — log today's new prediction, outcome unknown
-    6. snapshot       — value every portfolio at today's close
-    7. alerts         — evaluate standing alert rules against all of the above
+    6. enrich         — fill in company names and sectors for new tickers
+    7. snapshot       — value every portfolio at today's close
+    8. alerts         — evaluate standing alert rules against all of the above
 
 Steps 1-3 used to be missing: the job predicted and backtested against
 whatever happened to be in the database, so on a deployment where nobody
@@ -71,6 +72,7 @@ from backtest_daily import run_backtest  # noqa: E402
 from predict_daily import run_daily_predictions  # noqa: E402
 
 import alerts_engine  # noqa: E402
+import company_info  # noqa: E402
 import wallet  # noqa: E402
 
 load_dotenv()
@@ -140,6 +142,26 @@ def score_sentiment(conn, tickers: list[str]) -> None:
                         ticker, result["scored"], result["days"])
         except Exception:
             logger.exception("Sentiment scoring failed for %s", ticker)
+
+
+def enrich_companies(conn) -> None:
+    """
+    Fills in display names and sectors for any company row still holding
+    the placeholder the FK-satisfying inserts write.
+
+    Runs after ingestion so tickers first seen this cycle are included,
+    and before snapshots so the sector breakdown on the analytics page
+    reflects today's holdings rather than yesterday's.
+    """
+    try:
+        result = company_info.backfill_all(conn)
+    except Exception:
+        logger.exception("Company enrichment failed")
+        conn.rollback()
+        return
+
+    logger.info("companies: enriched %s of %s placeholder row(s)",
+                result["updated"], result["examined"])
 
 
 def snapshot_portfolios(conn) -> None:
@@ -269,6 +291,7 @@ def daily_job(skip_sentiment: bool = False) -> None:
         return
 
     try:
+        enrich_companies(conn)
         snapshot_portfolios(conn)
         check_alerts(conn)
     finally:

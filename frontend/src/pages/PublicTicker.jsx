@@ -50,7 +50,8 @@ export default function PublicTicker() {
   }
 
   const latest = data.latest_prediction;
-  const accuracy = data.accuracy_summary;
+  const accuracy = data.track_record;
+  const recentHistory = data.history;
 
   return (
     <div className="public-page">
@@ -108,11 +109,11 @@ export default function PublicTicker() {
           </div>
         </div>
 
-        {data.recent_predictions?.length > 0 && (
+        {recentHistory?.length > 0 && (
           <div className="card public-card">
             <h3>Recent predictions</h3>
             <div className="public-history">
-              {data.recent_predictions.map((p, i) => (
+              {recentHistory.map((p, i) => (
                 <div key={i} className="public-history-row">
                   <span className={`public-history-dir ${p.predicted_direction}`}>
                     {p.predicted_direction === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}

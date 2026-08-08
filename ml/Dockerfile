@@ -25,6 +25,16 @@ COPY backend/ /app/backend/
 ENV HF_HOME=/cache/huggingface
 RUN mkdir -p /cache/huggingface
 
+# Both of these are mounted as named volumes by docker-compose. The
+# directories must exist in the IMAGE, and be owned by appuser, before the
+# volume is first mounted: Docker seeds an empty named volume from the
+# image path underneath it, ownership included, but if that path doesn't
+# exist it creates the mountpoint root-owned instead. The container runs
+# as appuser, so that made train_lstm.py fail every save with
+# "checkpoints/baseline_AAPL.pt cannot be opened" — after doing all the
+# training work, which reads as a torch bug rather than a chown problem.
+RUN mkdir -p /app/ml/checkpoints
+
 RUN useradd --create-home --uid 1000 appuser \
     && chown -R appuser:appuser /app /cache
 USER appuser

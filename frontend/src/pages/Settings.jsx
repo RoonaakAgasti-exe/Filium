@@ -21,7 +21,7 @@ export default function Settings() {
         setAutoInvest(Boolean(parsed.enabled));
         if (parsed.threshold) setThreshold(parsed.threshold);
       } catch {
-        /* ignore malformed local settings */
+
       }
     }
   }, []);

@@ -1,10 +1,8 @@
-# Secrets. .env.example is the template that IS committed; .env is the
-# filled-in copy with real keys and must never be.
 .env
 .env.local
 .env.*.local
-
-# Python
+.e2e_token
+data/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -14,30 +12,21 @@ venv/
 .coverage
 coverage.xml
 htmlcov/
-
-# Node / frontend build output
 node_modules/
 frontend/dist/
 npm-debug.log*
-
-# Model checkpoints — regenerate with ml/train_lstm.py rather than
-# committing binaries that bloat the history.
+*.log
 *.pt
 *.pth
 ml/checkpoints/
-
-# Hugging Face / FinBERT cache
 .cache/
 huggingface/
-
-# Per-machine Claude Code settings (tool permissions granted on this box).
-# .claude/settings.json would be shared config; the .local.json override
-# is personal and shouldn't follow the repo around.
-.claude/settings.local.json
-
-# Editors / OS
+.claude/
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.swp
+implementation_plan.md
+task.md
+test_results.log

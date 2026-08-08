@@ -12,9 +12,8 @@ queries in alerts_engine are the only thing that distinguishes them, and
 matching whole statements would turn any whitespace edit in the module
 under test into a test failure.
 """
-from datetime import date, datetime, timedelta, timezone
-
 import pytest
+from datetime import date, datetime, timedelta, timezone
 
 from backend.alerts_engine import (
     RULE_DESCRIPTIONS,
@@ -22,6 +21,7 @@ from backend.alerts_engine import (
     _already_fired_today,
     evaluate_all_alerts,
     evaluate_rule,
+    parse_alert_text,
 )
 
 # Column order of the SELECT in evaluate_all_alerts.
@@ -352,3 +352,78 @@ class TestEvaluateAllAlerts:
         assert len(fired) == 1
         assert fired[0]["ticker"] == "AAPL"
         assert conn.rollbacks == 1
+
+
+class TestParseAlertText:
+    """
+    The keyword fallback used when no LLM is available.
+
+    /alerts/natural used to 503 outright without OPENAI_API_KEY, which
+    made the PDF's "custom alerts via natural language" feature absent on
+    every keyless deployment — and on the much more common one whose key
+    has run out of credit. The rule vocabulary is five fixed shapes, so
+    matching on them directly loses tolerance for odd phrasing, not
+    capability.
+    """
+
+    def test_the_pdf_example_parses(self):
+        # The exact phrasing the PDF gives as the worked example.
+        rule = parse_alert_text("notify me if NVDA's sentiment turns negative")
+        assert rule["ticker"] == "NVDA"
+        assert rule["rule_type"] == "sentiment_below"
+        assert rule["threshold"] == 0.0
+
+    def test_a_dollar_prefixed_ticker_is_recognised(self):
+        assert parse_alert_text("tell me when $aapl's prediction flips")["ticker"] == "AAPL"
+
+    def test_prediction_flip_needs_no_threshold(self):
+        rule = parse_alert_text("alert me when TSLA changes direction")
+        assert rule["rule_type"] == "prediction_flip"
+        assert rule["threshold"] is None
+
+    def test_a_percentage_becomes_a_price_move_threshold(self):
+        rule = parse_alert_text("alert me if TSLA moves more than 5%")
+        assert rule["rule_type"] == "price_move"
+        assert rule["threshold"] == 5.0
+
+    def test_a_price_move_threshold_is_always_positive(self):
+        # "drops 3%" is a 3% move, not a -3% one; evaluate_rule compares
+        # against abs(change), so a negative threshold would fire on
+        # literally every trading day.
+        assert parse_alert_text("tell me if GOOGL drops 3 percent")["threshold"] == 3.0
+
+    def test_a_confidence_percentage_is_converted_to_a_fraction(self):
+        # confidence_above is compared against `confidence`, which is 0-1.
+        # Storing 80 rather than 0.8 makes the rule unfireable.
+        rule = parse_alert_text("notify me when MSFT confidence is above 80%")
+        assert rule["rule_type"] == "confidence_above"
+        assert rule["threshold"] == 0.8
+
+    def test_an_explicit_sentiment_level_is_kept_on_its_own_scale(self):
+        rule = parse_alert_text("let me know if AMZN sentiment rises above 0.3")
+        assert rule["rule_type"] == "sentiment_above"
+        assert rule["threshold"] == 0.3
+
+    def test_a_common_uppercase_word_is_not_mistaken_for_a_ticker(self):
+        # "IF" is the first all-caps token in this sentence. Reading it as a
+        # ticker would create a rule that silently watches the wrong thing,
+        # which is worse than refusing to create one at all.
+        assert parse_alert_text("notify me IF NVDA drops 4%")["ticker"] == "NVDA"
+
+    def test_a_request_with_no_ticker_is_refused(self):
+        with pytest.raises(ValueError, match="ticker"):
+            parse_alert_text("notify me if sentiment turns negative")
+
+    def test_a_request_that_maps_to_no_rule_is_refused(self):
+        with pytest.raises(ValueError, match="supported alert"):
+            parse_alert_text("do something clever with QQQ")
+
+    def test_every_rule_type_it_returns_is_one_the_engine_knows(self):
+        texts = [
+            "NVDA sentiment turns negative",
+            "AAPL prediction flips",
+            "TSLA moves more than 5%",
+            "MSFT confidence above 80%",
+            "AMZN sentiment rises above 0.3",
+        ]
+        assert {parse_alert_text(t)["rule_type"] for t in texts} <= set(RULE_TYPES)

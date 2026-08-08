@@ -16,7 +16,16 @@ function formatMoney(n, opts = {}) {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2, ...opts });
 }
 
-/** Tiny real-data sparkline for a single holding, drawn with inline SVG (no extra chart mount cost per row). */
+function formatPct(n, digits = 1) {
+  if (n == null) return '—';
+  return `${(n * 100).toFixed(digits)}%`;
+}
+
+function formatNum(n, digits = 2) {
+  if (n == null) return '—';
+  return n.toFixed(digits);
+}
+
 function Sparkline({ points }) {
   if (!points || points.length < 2) return <span className="empty-state" style={{ padding: 0 }}>—</span>;
   const w = 88;
@@ -39,21 +48,27 @@ export default function Portfolio() {
   const [history, setHistory] = useState([]);
   const [benchmark, setBenchmark] = useState(null);
   const [benchmarkSeries, setBenchmarkSeries] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [sparklines, setSparklines] = useState({});
+  const [transactions, setTransactions] = useState([]);
   const [tradeTicker, setTradeTicker] = useState('');
   const [tradeShares, setTradeShares] = useState('');
   const [tradeError, setTradeError] = useState('');
   const [tradeBusy, setTradeBusy] = useState(false);
 
   async function loadAll() {
-    const [portfolioResult, historyResult, benchmarkResult] = await Promise.allSettled([
+    const [portfolioResult, historyResult, benchmarkResult, analyticsResult, txResult] = await Promise.allSettled([
       api.getPortfolio(),
       api.getPortfolioHistory(),
       api.getBenchmarkComparison(),
+      api.getPortfolioAnalytics(),
+      api.getTransactions(50),
     ]);
     if (portfolioResult.status === 'fulfilled') setPortfolio(portfolioResult.value);
     if (historyResult.status === 'fulfilled') setHistory(historyResult.value);
     if (benchmarkResult.status === 'fulfilled') setBenchmark(benchmarkResult.value);
+    if (analyticsResult.status === 'fulfilled') setAnalytics(analyticsResult.value);
+    if (txResult.status === 'fulfilled') setTransactions(txResult.value);
 
     if (portfolioResult.status === 'fulfilled') {
       const tickers = portfolioResult.value.holdings.map((h) => h.ticker);
@@ -71,8 +86,6 @@ export default function Portfolio() {
     api.getPriceHistory('SPY', 365).then((r) => setBenchmarkSeries(r.candles)).catch(() => {});
   }, []);
 
-  // Normalize portfolio value and SPY close to "% change since first shared date" so
-  // two very different scales (dollars vs. index price) plot on one comparable line.
   const comparisonChart = useMemo(() => {
     if (!history.length) return [];
     const spyByDate = new Map(benchmarkSeries.map((c) => [c.date, c.close]));
@@ -199,6 +212,131 @@ export default function Portfolio() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {analytics && (
+            <div className="card">
+              <div className="card-head">
+                <h3 className="card-title">Analytics</h3>
+                {analytics.period_start && (
+                  <span className="page-sub mono">
+                    {analytics.period_start} → {analytics.period_end}
+                    {' '}({analytics.snapshot_count} snapshot{analytics.snapshot_count === 1 ? '' : 's'})
+                  </span>
+                )}
+              </div>
+
+              <div className="analytics-grid">
+                <div className="analytics-stat">
+                  <span className="stat-label">Total return</span>
+                  <span className={`stat-value mono ${
+                    analytics.total_return == null ? '' : analytics.total_return >= 0 ? 'gain' : 'loss'
+                  }`}>
+                    {formatPct(analytics.total_return)}
+                  </span>
+                </div>
+                <div className="analytics-stat">
+                  <span className="stat-label">Sharpe</span>
+                  <span className="stat-value mono">{formatNum(analytics.sharpe_ratio)}</span>
+                </div>
+                <div className="analytics-stat">
+                  <span className="stat-label">Volatility (ann.)</span>
+                  <span className="stat-value mono">{formatPct(analytics.volatility_annualized)}</span>
+                </div>
+                <div className="analytics-stat">
+                  <span className="stat-label">Max drawdown</span>
+                  <span className={`stat-value mono ${analytics.max_drawdown ? 'loss' : ''}`}>
+                    {formatPct(analytics.max_drawdown?.max_drawdown)}
+                  </span>
+                </div>
+                <div className="analytics-stat">
+                  <span className="stat-label">Win rate</span>
+                  <span className="stat-value mono">{formatPct(analytics.trades?.win_rate)}</span>
+                </div>
+                <div className="analytics-stat">
+                  <span className="stat-label">Realized P&amp;L</span>
+                  <span className={`stat-value mono ${
+                    !analytics.trades?.total_realized_pl ? '' :
+                      analytics.trades.total_realized_pl >= 0 ? 'gain' : 'loss'
+                  }`}>
+                    {formatMoney(analytics.trades?.total_realized_pl)}
+                  </span>
+                </div>
+              </div>
+
+              {analytics.trades?.closed_trades > 0 && (
+                <p className="page-sub analytics-trades">
+                  {analytics.trades.closed_trades} closed trade
+                  {analytics.trades.closed_trades === 1 ? '' : 's'} ·{' '}
+                  {analytics.trades.wins}W / {analytics.trades.losses}L · best{' '}
+                  {formatMoney(analytics.trades.best_trade)}, worst{' '}
+                  {formatMoney(analytics.trades.worst_trade)}
+                </p>
+              )}
+
+              {analytics.sector_exposure?.length > 0 && (
+                <div className="sector-list">
+                  <span className="stat-label">Sector exposure</span>
+                  {analytics.sector_exposure.map((s) => (
+                    <div className="sector-row" key={s.sector}>
+                      <span className="sector-name">{s.sector}</span>
+                      <div className="sector-bar">
+                        <div className="sector-fill" style={{ width: `${(s.weight * 100).toFixed(1)}%` }} />
+                      </div>
+                      <span className="sector-weight mono">{formatPct(s.weight)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {}
+              {analytics.note && <p className="page-sub analytics-note">{analytics.note}</p>}
+            </div>
+          )}
+
+          {transactions.length > 0 && (
+            <div className="card">
+              <div className="card-head">
+                <h3 className="card-title">Trade history</h3>
+                <span className="badge">{transactions.length} trades</span>
+              </div>
+              <div className="tx-list">
+                {transactions.map((t) => (
+                  <div key={t.id} className="tx-row">
+                    <div className="tx-row-main">
+                      <div className="ticker-chip">{t.ticker.slice(0, 2)}</div>
+                      <div className="tx-info">
+                        <span className={`tx-action ${t.action}`}>
+                          {t.action.toUpperCase()} {t.ticker}
+                        </span>
+                        <span className="tx-meta mono">
+                          {t.shares} sh @ {formatMoney(t.price_per_share)}
+                          {t.triggered_by_prediction && (
+                            <span className="badge badge-pending" style={{ marginLeft: 6 }}>AI signal</span>
+                          )}
+                        </span>
+                        {t.explanation && (
+                          <span className="tx-explain">{t.explanation}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="tx-row-right">
+                      <span className={`mono tx-amount ${t.action === 'buy' ? 'loss' : 'gain'}`}>
+                        {t.action === 'buy' ? '-' : '+'}{formatMoney(t.amount)}
+                      </span>
+                      {t.realized_pl != null && (
+                        <span className={`mono tx-pl ${t.realized_pl >= 0 ? 'gain' : 'loss'}`}>
+                          P&L {formatMoney(t.realized_pl)}
+                        </span>
+                      )}
+                      <span className="tx-date mono">
+                        {new Date(t.executed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

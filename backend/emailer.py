@@ -18,10 +18,8 @@ import config
 
 logger = logging.getLogger("fincopilot.emailer")
 
-
 def is_configured() -> bool:
     return config.EMAIL_ENABLED
-
 
 def send_email(to_address: str, subject: str, body: str) -> bool:
     """Returns True if the message was handed off to the SMTP server."""
@@ -45,11 +43,8 @@ def send_email(to_address: str, subject: str, body: str) -> bool:
         logger.info("Sent alert email to %s", to_address)
         return True
     except Exception as exc:
-        # Deliberately broad: a misconfigured mail server must not take
-        # down the nightly alert job for every other user.
         logger.warning("Failed to send alert email to %s: %s", to_address, exc)
         return False
-
 
 def send_alert_email(to_address: str, ticker: str, message_text: str) -> bool:
     subject = f"FinCopilot alert: {ticker}"

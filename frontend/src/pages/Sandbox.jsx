@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Play, TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
+import { Play, BarChart3 } from 'lucide-react';
 import Layout from '../components/Layout';
 import Topbar from '../components/Topbar';
 import { api } from '../api/client';
@@ -162,19 +162,33 @@ export default function Sandbox() {
                   </div>
                   <div className="sandbox-stat">
                     <span className="sandbox-stat-label">Buy-and-hold return</span>
-                    <span className={`sandbox-stat-value ${result.buy_and_hold_return >= 0 ? 'gain' : 'loss'}`}>
-                      {formatPct(result.buy_and_hold_return)}
+                    <span className={`sandbox-stat-value ${result.buy_hold_return >= 0 ? 'gain' : 'loss'}`}>
+                      {formatPct(result.buy_hold_return)}
                     </span>
                   </div>
                   <div className="sandbox-stat">
                     <span className="sandbox-stat-label">Excess return</span>
-                    <span className={`sandbox-stat-value ${result.excess_return >= 0 ? 'gain' : 'loss'}`}>
-                      {formatPct(result.excess_return)}
-                    </span>
+                    {(() => {
+                      const excess = result.strategy_return != null && result.buy_hold_return != null
+                        ? result.strategy_return - result.buy_hold_return : null;
+                      return (
+                        <span className={`sandbox-stat-value ${excess == null ? '' : excess >= 0 ? 'gain' : 'loss'}`}>
+                          {formatPct(excess)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="sandbox-stat">
                     <span className="sandbox-stat-label">Final value</span>
                     <span className="sandbox-stat-value">{formatMoney(result.final_value)}</span>
+                  </div>
+                  <div className="sandbox-stat">
+                    <span className="sandbox-stat-label">Win rate</span>
+                    <span className="sandbox-stat-value">{formatPct(result.win_rate)}</span>
+                  </div>
+                  <div className="sandbox-stat">
+                    <span className="sandbox-stat-label">Strategy Sharpe</span>
+                    <span className="sandbox-stat-value">{result.strategy_sharpe != null ? result.strategy_sharpe.toFixed(2) : '—'}</span>
                   </div>
                 </div>
               </div>
@@ -207,12 +221,12 @@ export default function Sandbox() {
                 </div>
                 <div className="sandbox-equity">
                   {result.equity_curve?.slice(-30).map((p, i) => (
-                    <div key={i} className="equity-bar" title={`${p.date}: ${formatMoney(p.value)}`}>
+                    <div key={i} className="equity-bar" title={`${p.date}: ${formatMoney(p.strategy_value)}`}>
                       <div
                         className="equity-bar-fill"
                         style={{
-                          height: `${Math.max(2, ((p.value - result.starting_cash) / result.starting_cash) * 100 + 20)}px`,
-                          background: p.value >= result.starting_cash ? 'var(--color-gain)' : 'var(--color-loss)',
+                          height: `${Math.max(2, ((p.strategy_value - result.starting_cash) / result.starting_cash) * 100 + 20)}px`,
+                          background: p.strategy_value >= result.starting_cash ? 'var(--color-gain)' : 'var(--color-loss)',
                         }}
                       />
                     </div>

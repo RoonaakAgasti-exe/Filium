@@ -113,14 +113,31 @@ def load_model(checkpoint_path: Path):
     return model, ckpt
 
 
-def load_recent_prices(conn, ticker: str, rows: int = HISTORY_ROWS) -> pd.DataFrame:
+def load_recent_prices(conn, ticker: str, rows: int = HISTORY_ROWS,
+                       as_of: date | None = None) -> pd.DataFrame:
+    """
+    The most recent `rows` bars at or before `as_of` (default: all of them).
+
+    The cutoff is what makes a dated prediction honest. run_daily_predictions
+    accepts an `as_of`, but this used to always load the newest bars in the
+    table regardless — so asking it to predict a past date built the
+    features from prices that date hadn't seen yet, stamped the result
+    with the old prediction_date, and handed the backtester a row that
+    was guaranteed to score well. That is precisely the lookahead the
+    train/test split in train_lstm.py goes out of its way to avoid.
+    """
     cur = conn.cursor()
     try:
-        cur.execute(
-            "SELECT date, open, high, low, close, volume FROM price_history "
-            "WHERE ticker = %s AND close IS NOT NULL ORDER BY date DESC LIMIT %s",
-            (ticker, rows),
-        )
+        sql = ("SELECT date, open, high, low, close, volume FROM price_history "
+               "WHERE ticker = %s AND close IS NOT NULL")
+        params: list = [ticker]
+        if as_of is not None:
+            sql += " AND date <= %s"
+            params.append(as_of)
+        sql += " ORDER BY date DESC LIMIT %s"
+        params.append(rows)
+
+        cur.execute(sql, tuple(params))
         fetched = list(reversed(cur.fetchall()))
     finally:
         cur.close()
@@ -136,14 +153,20 @@ def load_recent_prices(conn, ticker: str, rows: int = HISTORY_ROWS) -> pd.DataFr
     return df
 
 
-def load_sentiment(conn, ticker: str, source: str = "news") -> pd.DataFrame:
+def load_sentiment(conn, ticker: str, source: str = "news",
+                   as_of: date | None = None) -> pd.DataFrame:
+    """Daily sentiment at or before `as_of` — same cutoff rule as prices."""
     cur = conn.cursor()
     try:
-        cur.execute(
-            "SELECT date, score FROM sentiment_scores WHERE ticker = %s AND source = %s "
-            "ORDER BY date",
-            (ticker, source),
-        )
+        sql = ("SELECT date, score FROM sentiment_scores "
+               "WHERE ticker = %s AND source = %s")
+        params: list = [ticker, source]
+        if as_of is not None:
+            sql += " AND date <= %s"
+            params.append(as_of)
+        sql += " ORDER BY date"
+
+        cur.execute(sql, tuple(params))
         rows = cur.fetchall()
     finally:
         cur.close()
@@ -268,14 +291,16 @@ def run_daily_predictions(tickers: list[str] | None = None, as_of: date | None =
 
         for ticker in targets:
             ticker = ticker.upper()
-            price_df = load_recent_prices(conn, ticker)
+            # `today` is the cutoff, not just a label: features must come
+            # only from bars this prediction could actually have seen.
+            price_df = load_recent_prices(conn, ticker, as_of=today)
             if price_df.empty:
                 print(f"  {ticker}: no price history — run "
                       f"ingestion/fetch_prices.py {ticker}")
                 skipped += 1
                 continue
 
-            sentiment_df = load_sentiment(conn, ticker)
+            sentiment_df = load_sentiment(conn, ticker, as_of=today)
             features_df = build_inference_features(price_df, sentiment_df)
 
             last_close_date = price_df["date"].iloc[-1].date()
@@ -318,13 +343,57 @@ def run_daily_predictions(tickers: list[str] | None = None, as_of: date | None =
         conn.close()
 
 
+def backfill_predictions(tickers: list[str] | None = None, days: int = 60) -> dict:
+    """
+    Replays the last `days` calendar days, logging what each model would
+    have predicted on each of them.
+
+    This exists because a fresh deployment's leaderboard, calibration
+    curve and public track record are all empty until predictions have
+    been made *and* resolved, which otherwise takes weeks of the daily job
+    running before the app shows anything.
+
+    It is only honest because load_recent_prices/load_sentiment take an
+    `as_of` cutoff: each replayed day sees exactly the bars and sentiment
+    that existed at its own close, never later ones. The weights are still
+    the ones trained today, so treat this as "how would this model have
+    called these days", not as a walk-forward retraining study.
+    """
+    today = date.today()
+    totals = {"written": 0, "skipped": 0, "days": 0}
+
+    for offset in range(days, 0, -1):
+        as_of = today - timedelta(days=offset)
+        if as_of.weekday() >= 5:  # no close to predict from on a weekend
+            continue
+
+        print(f"\n--- replaying {as_of} ---")
+        result = run_daily_predictions(tickers=tickers, as_of=as_of)
+        totals["written"] += result["written"]
+        totals["skipped"] += result["skipped"]
+        totals["days"] += 1
+
+    print(f"\nBackfill complete: {totals['written']} prediction(s) across "
+          f"{totals['days']} trading day(s).")
+    return totals
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate and log daily predictions")
     parser.add_argument("--ticker", action="append", default=[],
                         help="Predict only this ticker; repeatable. Defaults to all watchlisted.")
+    parser.add_argument("--backfill", type=int, metavar="DAYS",
+                        help="Also replay the last DAYS days so the leaderboard and "
+                             "track record have history immediately. Each replayed day "
+                             "only sees data available at its own close.")
     args = parser.parse_args()
 
-    run_daily_predictions(tickers=[t.upper() for t in args.ticker] or None)
+    tickers = [t.upper() for t in args.ticker] or None
+
+    if args.backfill:
+        backfill_predictions(tickers=tickers, days=args.backfill)
+
+    run_daily_predictions(tickers=tickers)
 
 
 if __name__ == "__main__":

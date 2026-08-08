@@ -6,13 +6,44 @@ python-jose[cryptography]==3.3.0
 bcrypt==4.2.0
 pydantic[email]==2.9.2
 requests==2.32.3
+# backend/Dockerfile copies ingestion/ into the image (so the filing and
+# price scripts can be run against a live deployment) but used to install
+# only this file, which omitted bs4. The result was an image that shipped
+# ingestion/ingest_filing.py and could not run it:
+#   ModuleNotFoundError: No module named 'bs4'
+# That is the exact command rag.py's own "no filing data" error tells you
+# to run, so the one documented way to populate the corpus was broken
+# inside Docker — which is why a stack with prices, news and predictions
+# still had zero filings and a chat feature that could never answer.
+# html.parser is used throughout, so no lxml is needed.
+beautifulsoup4==4.12.3
 # Required by routers/query.py -> rag.py. The original requirements file
 # omitted this, so /query raised ModuleNotFoundError in the Docker image
 # even though it worked in a local dev shell that happened to have it.
-openai==1.54.0
+#
+# Must stay >= 1.55.3. httpx is an unpinned transitive dependency, so a
+# fresh image build gets httpx >= 0.28, which removed the `proxies`
+# argument that openai <= 1.55.2 passes to httpx.Client. The pin used to
+# be 1.54.0, which meant every clean build produced an image where the
+# first call into rag.py died with
+#   TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+# The tests never caught it because they don't construct an OpenAI client.
+openai==1.109.1
 
-# Optional: cross-encoder reranking in rag.py. Left out of the image on
-# purpose — it pulls in torch (~800MB) for a precision improvement that
-# isn't needed to run the app. rag.rerank_chunks falls back to embedding
-# similarity order when it isn't installed.
-# sentence-transformers==3.2.1
+# Two things depend on this, and they are not equally optional:
+#
+#   1. Cross-encoder reranking in rag.rerank_chunks — genuinely optional,
+#      falls back to embedding-similarity order when absent.
+#   2. Local embeddings in embeddings.py — NOT optional. This is the
+#      default provider whenever OPENAI_API_KEY is unset, and without it
+#      a keyless deployment has no way to embed anything, which puts back
+#      the exact cliff this app is built to avoid: no key, no vectors, no
+#      chunks, no chat.
+#
+# It was previously commented out because torch is enormous. The size
+# objection was real but the fix is the CPU wheel, not omission — the
+# backend never touches a GPU, and backend/Dockerfile installs from
+# PyTorch's CPU index, which is a few hundred MB rather than ~800MB of
+# bundled CUDA libraries. Installing this file WITHOUT that extra index
+# still works; it just produces a much larger environment.
+sentence-transformers==3.2.1

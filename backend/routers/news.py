@@ -18,7 +18,6 @@ from db import get_conn
 
 router = APIRouter(prefix="/news", tags=["news"])
 
-
 @router.get("/{ticker}")
 def get_news(ticker: str, limit: int = Query(default=30, ge=1, le=200),
              conn: PgConnection = Depends(get_conn)):
@@ -50,7 +49,6 @@ def get_news(ticker: str, limit: int = Query(default=30, ge=1, le=200),
             for r in rows
         ],
     }
-
 
 @router.get("/{ticker}/sentiment-timeline")
 def sentiment_timeline(ticker: str, days: int = Query(default=180, ge=1, le=1825),

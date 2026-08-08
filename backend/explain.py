@@ -31,7 +31,6 @@ Rules:
 - Plain prose, no bullet points, no preamble.
 """
 
-
 def gather_context(conn, ticker: str) -> dict:
     """Latest prediction and sentiment for a ticker, for the prompt and the audit row."""
     context: dict = {"prediction": None, "sentiment": None, "recent_close": None}
@@ -81,7 +80,6 @@ def gather_context(conn, ticker: str) -> dict:
 
     return context
 
-
 def _build_prompt(action: str, ticker: str, shares: float, price: float,
                   triggered_by_prediction: bool, context: dict) -> str:
     lines = [
@@ -116,22 +114,75 @@ def _build_prompt(action: str, ticker: str, shares: float, price: float,
 
     return "\n".join(lines)
 
+def template_explanation(action: str, ticker: str, shares: float, price: float,
+                         triggered_by_prediction: bool, context: dict) -> str:
+    """
+    The no-LLM explanation: state the signal, sentiment and price the trade
+    was placed against, without prose.
+
+    Every fact in here is already loaded by `gather_context` for the audit
+    row, so the LLM was never the source of the information — only of the
+    sentences. Without this the feature degraded to nothing at all: a
+    deployment with no key (or, as happens far more often, a key that has
+    run out of credit) recorded no explanation, `/trade/explanation/{id}`
+    404'd for every trade, and the UI showed an empty panel that is
+    indistinguishable from a bug. Saying the same facts flatly is worth
+    much more than saying nothing, and it keeps the honest-metrics
+    principle the rest of the app holds to: no model is in the loop, so
+    nothing here can be invented.
+    """
+    verb = "Bought" if action == "buy" else "Sold"
+    lines = [f"{verb} {shares:g} share(s) of {ticker} at ${price:,.2f}."]
+
+    prediction = context.get("prediction")
+    if prediction:
+        direction = prediction["direction"].lower()
+        agrees = (action == "buy" and direction == "up") or (action == "sell" and direction == "down")
+        lines.append(
+            f"The {prediction['model']} model's latest signal was "
+            f"{direction.upper()} for {prediction['target_date']} at "
+            f"{prediction['confidence']:.0%} confidence (made {prediction['prediction_date']}), "
+            f"so this trade {'follows' if agrees else 'runs against'} the signal."
+        )
+    else:
+        lines.append("No model prediction exists for this ticker yet, so the trade "
+                     "was not backed by a signal.")
+
+    sentiment = context.get("sentiment")
+    if sentiment:
+        score = sentiment["score"]
+        tone = "positive" if score > 0.05 else ("negative" if score < -0.05 else "roughly neutral")
+        lines.append(
+            f"FinBERT news sentiment was {score:+.2f} ({tone}) on {sentiment['date']}, "
+            f"across {sentiment['article_count']} article(s)."
+        )
+    else:
+        lines.append("No news sentiment has been scored for this ticker.")
+
+    if triggered_by_prediction:
+        lines.append("Marked as acting on the model signal.")
+
+    return " ".join(lines)
 
 def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: float,
                   price: float, triggered_by_prediction: bool) -> str | None:
     """
-    Generates and stores the explanation. Returns the text, or None if
-    generation was skipped or failed.
-    """
-    if not llm.is_configured():
-        return None
+    Generates and stores the explanation.
 
+    Falls back to a deterministic summary of the same context when no LLM
+    is available, so the feature degrades to plainer language rather than
+    to nothing — the same way rag.py answers extractively without a key.
+    """
     context = gather_context(conn, ticker)
     prompt = _build_prompt(action, ticker, shares, price, triggered_by_prediction, context)
 
-    text = llm.try_complete(prompt, system=SYSTEM_PROMPT, max_tokens=220)
+    text = None
+    if llm.is_configured():
+        text = llm.try_complete(prompt, system=SYSTEM_PROMPT, max_tokens=220)
+
     if not text:
-        return None
+        text = template_explanation(action, ticker, shares, price,
+                                    triggered_by_prediction, context)
 
     prediction_id = (context.get("prediction") or {}).get("id")
     sentiment_score = (context.get("sentiment") or {}).get("score")
@@ -147,7 +198,6 @@ def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: f
         )
         conn.commit()
     except Exception:
-        # The explanation is a nice-to-have; the trade is already durable.
         logger.exception("Failed to store trade explanation for transaction %s", transaction_id)
         conn.rollback()
     finally:

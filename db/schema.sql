@@ -47,7 +47,17 @@ CREATE TABLE IF NOT EXISTS filing_chunks (
     id              SERIAL PRIMARY KEY,
     filing_id       INTEGER NOT NULL REFERENCES filings(id) ON DELETE CASCADE,
     chunk_text      TEXT NOT NULL,
-    embedding       vector(1536),        -- 1536 = OpenAI text-embedding-3-small dimension
+    -- 1536 = OpenAI text-embedding-3-small. This is the starting width,
+    -- not a fixed one: the active model is chosen at runtime by
+    -- EMBEDDING_PROVIDER (local BAAI/bge-small-en-v1.5 is 384), and
+    -- ingestion/chunk_and_embed.py narrows or widens this column to match
+    -- while the table is still empty. Nothing here needs editing to run
+    -- without an OpenAI key.
+    embedding       vector(1536),
+    -- Which model produced `embedding`. Vectors from different models are
+    -- not comparable, so queries embedded by a different model are
+    -- refused rather than ranked — see backend/embeddings.py.
+    embedding_model TEXT,
     section_label   TEXT,
     chunk_index     INTEGER NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -146,7 +156,13 @@ CREATE TABLE IF NOT EXISTS predictions (
     predicted_direction TEXT NOT NULL CHECK (predicted_direction IN ('up', 'down')),
     confidence          NUMERIC(5, 4) NOT NULL,
     prob_up             NUMERIC(6, 5),
-    actual_direction    TEXT CHECK (actual_direction IN ('up', 'down', NULL)),
+    -- `IS NULL OR ... IN (...)`, not `IN ('up','down',NULL)`. Listing NULL
+    -- inside IN makes the whole constraint a no-op: for an unexpected value
+    -- the expression is `FALSE OR FALSE OR NULL` -> NULL, and a CHECK passes
+    -- on NULL as readily as on TRUE. The version below is the one that
+    -- actually rejects a bad write. See migrations/005.
+    actual_direction    TEXT CHECK (actual_direction IS NULL
+                                    OR actual_direction IN ('up', 'down')),
     -- The bar actual_direction was actually scored against. Usually
     -- target_date, but market holidays and late-arriving price data push
     -- it out — storing it keeps the accuracy record auditable instead of

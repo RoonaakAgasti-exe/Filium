@@ -45,13 +45,13 @@ is worth more than a suspiciously perfect one.)*
        │                               │                    │
 ┌──────▼──────────┐         ┌─────────▼─────────┐  ┌───────▼────────┐
 │    DATABASE       │         │   AI / ML             │  │   ALPACA          │
-│  PostgreSQL +        │         │  - OpenAI embeddings   │  │  Paper Trading API │
-│  pgvector              │         │  - LLM (RAG answers)     │  │  (real prices,      │
-│  filings, chunks,        │         │  - FinBERT sentiment       │  │   fake money)         │
-│  prices, predictions,      │         │  - LSTM (direction)           │  └────────────────────┘
-│  wallets, transactions,      │         └───────────────────────────┘
-│  portfolio_snapshots           │
-└─────────┬─────────────────────┘
+│  PostgreSQL +        │         │  - Embeddings:            │  │  Paper Trading API │
+│  pgvector              │         │    local or OpenAI       │  │  (real prices,      │
+│  filings, chunks,        │         │  - LLM (RAG answers,   │  │   fake money)         │
+│  prices, predictions,      │         │    optional)                 │  └────────────────────┘
+│  wallets, transactions,      │         │  - FinBERT sentiment       │
+│  portfolio_snapshots           │         │  - LSTM (direction)           │
+└─────────┬─────────────────────┘         └───────────────────────────┘
           │
 ┌─────────▼───────────┐        ┌──────────────────┐
 │   INGESTION            │        │   SCHEDULER          │
@@ -82,7 +82,8 @@ fincopilot/
 | Frontend | React (Vite) | Fast dev loop, good charting ecosystem (recharts) |
 | Backend | FastAPI | Async-friendly, plays well with ML code, auto-generated docs |
 | Database | PostgreSQL + pgvector | One database for relational data and vector search — no separate vector DB to keep in sync |
-| Embeddings/LLM | OpenAI (`text-embedding-3-small`, `gpt-4o-mini`) | Cheap enough to run a real eval harness against |
+| Embeddings | OpenAI `text-embedding-3-small`, or local `BAAI/bge-small-en-v1.5` | Retrieval is the feature; it shouldn't need a billing account. The local model needs no key and is competitive over filing prose |
+| Answer generation | OpenAI `gpt-4o-mini` | Cheap enough to run a real eval harness against. Optional — without it, answers are the cited passages themselves rather than prose |
 | Sentiment | FinBERT (pretrained, inference-only) | Purpose-built for financial text tone |
 | Prediction | LSTM (PyTorch), price + sentiment features | Extends an existing baseline rather than starting from scratch |
 | Trading | Alpaca Paper Trading API | Real market prices and order mechanics with zero real-money risk or licensing burden |
@@ -92,18 +93,29 @@ fincopilot/
 
 ```bash
 git clone <your-repo-url> && cd fincopilot
-cp .env.example .env   # fill in real API keys — see comments in the file for where to get each one
+cp .env.example .env   # works as-is; see below for what keys add
 
-# 1. Ingest a filing
+# 1. Ingest a filing — fetch, clean, chunk and embed in one step
 pip install -r ingestion/requirements.txt
-python ingestion/fetch_filing.py AAPL
-python ingestion/clean_filing.py data/raw/AAPL_10-K_<date>.html
-python ingestion/chunk_and_embed.py data/processed/AAPL_10-K_<date>.json \
-    --ticker AAPL --filing-type 10-K --filing-date <date> --source-url <url>
+python ingestion/ingest_filing.py AAPL
 
 # 2. Run everything with Docker Compose
 docker compose up --build
 ```
+
+**You do not need any API keys to run this.** Copying `.env.example`
+without editing it gives you a working app: prices come from Yahoo,
+news from Google RSS, paper trading from this app's own ledger, and
+filing search from a local embedding model that downloads on first use.
+
+Keys are upgrades, not requirements. `OPENAI_API_KEY` is the one worth
+adding first — not for search, which works without it, but because it
+turns the cited passages the chat returns into written answers. `/health`
+reports exactly which integrations are live.
+
+The three ingestion steps still exist separately (`fetch_filing.py`,
+`clean_filing.py`, `chunk_and_embed.py`) if you want to re-clean without
+re-downloading, or re-embed after changing the chunk size.
 
 Then visit `http://localhost` for the app and `http://localhost:8000/docs`
 for the interactive API reference.

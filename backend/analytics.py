@@ -13,15 +13,8 @@ without a database, with thin `*_for_user` wrappers doing the querying.
 """
 
 import math
-from datetime import date
 
 TRADING_DAYS_PER_YEAR = 252
-
-
-# ---------------------------------------------------------------------
-# Pure computation
-# ---------------------------------------------------------------------
-
 
 def daily_returns(values: list[float]) -> list[float]:
     """Simple period-over-period returns from an equity curve."""
@@ -30,7 +23,6 @@ def daily_returns(values: list[float]) -> list[float]:
         if prev:
             out.append((curr - prev) / prev)
     return out
-
 
 def sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0,
                  periods_per_year: int = TRADING_DAYS_PER_YEAR) -> float | None:
@@ -50,7 +42,6 @@ def sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0,
 
     excess = mean - (risk_free_rate / periods_per_year)
     return (excess / std) * math.sqrt(periods_per_year)
-
 
 def max_drawdown(values: list[float]) -> dict | None:
     """
@@ -83,7 +74,6 @@ def max_drawdown(values: list[float]) -> dict | None:
         "trough_index": worst_trough_index,
     }
 
-
 def trade_stats(sells: list[dict]) -> dict:
     """
     Win rate and P&L summary over closed (sold) positions.
@@ -111,12 +101,10 @@ def trade_stats(sells: list[dict]) -> dict:
         "total_realized_pl": sum(realized),
         "avg_win": (gross_profit / len(wins)) if wins else None,
         "avg_loss": (-gross_loss / len(losses)) if losses else None,
-        # Undefined rather than infinite when nothing has lost money yet.
         "profit_factor": (gross_profit / gross_loss) if gross_loss else None,
         "best_trade": max(realized),
         "worst_trade": min(realized),
     }
-
 
 def sector_exposure(holdings: list[dict]) -> list[dict]:
     """
@@ -144,7 +132,6 @@ def sector_exposure(holdings: list[dict]) -> list[dict]:
         reverse=True,
     )
 
-
 def calibration_curve(predictions: list[dict], num_bins: int = 5) -> dict:
     """
     Buckets resolved predictions by predicted P(up) and compares the mean
@@ -166,7 +153,6 @@ def calibration_curve(predictions: list[dict], num_bins: int = 5) -> dict:
     for i in range(num_bins):
         low = i / num_bins
         high = (i + 1) / num_bins
-        # Last bin is closed on the right so prob_up == 1.0 has a home.
         members = [
             p for p in usable
             if low <= float(p["prob_up"]) < high
@@ -188,9 +174,6 @@ def calibration_curve(predictions: list[dict], num_bins: int = 5) -> dict:
             "observed_frequency": observed,
         })
 
-    # Expected Calibration Error: how far, on average, the predicted
-    # probability sits from reality — weighted by how many predictions
-    # fall in each bucket.
     total = len(usable)
     ece = None
     if total:
@@ -212,12 +195,6 @@ def calibration_curve(predictions: list[dict], num_bins: int = 5) -> dict:
         "expected_calibration_error": ece,
         "brier_score": brier,
     }
-
-
-# ---------------------------------------------------------------------
-# Database-backed wrappers
-# ---------------------------------------------------------------------
-
 
 def portfolio_analytics(conn, user_id: int, holdings: list[dict]) -> dict:
     cur = conn.cursor()
@@ -274,13 +251,11 @@ def portfolio_analytics(conn, user_id: int, holdings: list[dict]) -> dict:
         ),
     }
 
-
 def _stdev(values: list[float]) -> float:
     if len(values) < 2:
         return 0.0
     mean = sum(values) / len(values)
     return math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
-
 
 def prediction_calibration(conn, ticker: str | None = None, model_version_id: int | None = None,
                            num_bins: int = 5) -> dict:
@@ -320,7 +295,6 @@ def prediction_calibration(conn, ticker: str | None = None, model_version_id: in
             "excluded from the curve."
         )
     return result
-
 
 def accuracy_summary(conn, ticker: str | None = None, model_version_id: int | None = None) -> dict:
     sql = [

@@ -2,36 +2,25 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from alerts_engine import RULE_TYPES
-
-
-# --- Auth ------------------------------------------------------------
-
 
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
 
-
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
-
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-
-# --- RAG -------------------------------------------------------------
-
-
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     ticker: str | None = None
-
 
 class PeerQueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
@@ -43,8 +32,6 @@ class PeerQueryRequest(BaseModel):
         cleaned = [t.strip().upper() for t in v if t and t.strip()]
         if not cleaned:
             raise ValueError("At least one ticker is required")
-        # Preserve order while dropping repeats — asking about AAPL twice
-        # would otherwise burn half the context window on one company.
         seen, out = set(), []
         for t in cleaned:
             if t not in seen:
@@ -52,13 +39,11 @@ class PeerQueryRequest(BaseModel):
                 out.append(t)
         return out
 
-
 class CompareFilingsRequest(BaseModel):
     ticker: str
     question: str = Field(min_length=1, max_length=2000)
     earlier_filing_id: int | None = None
     later_filing_id: int | None = None
-
 
 class QuerySource(BaseModel):
     marker: int
@@ -72,17 +57,14 @@ class QuerySource(BaseModel):
     excerpt_truncated: bool = False
     distance: float | None = None
 
-
 class QueryResponse(BaseModel):
     answer: str
     sources: list[QuerySource]
     all_sources: list[QuerySource] = []
-
-
-# --- Predictions -----------------------------------------------------
-
+    generated: bool = True
 
 class PredictionResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     ticker: str
     prediction_date: date
     target_date: date
@@ -92,7 +74,6 @@ class PredictionResponse(BaseModel):
     actual_direction: str | None = None
     model_name: str | None = None
 
-
 class BacktestSummary(BaseModel):
     ticker: str
     total_predictions: int
@@ -100,21 +81,12 @@ class BacktestSummary(BaseModel):
     correct_predictions: int
     accuracy: float | None = None
 
-
-# --- Watchlist -------------------------------------------------------
-
-
 class WatchlistAdd(BaseModel):
     ticker: str = Field(min_length=1, max_length=10)
-
 
 class WatchlistItem(BaseModel):
     ticker: str
     added_at: datetime
-
-
-# --- Alerts ----------------------------------------------------------
-
 
 class AlertCreate(BaseModel):
     ticker: str = Field(min_length=1, max_length=10)
@@ -128,10 +100,8 @@ class AlertCreate(BaseModel):
             raise ValueError(f"rule_type must be one of: {', '.join(RULE_TYPES)}")
         return v
 
-
 class NaturalLanguageAlertCreate(BaseModel):
     text: str = Field(min_length=3, max_length=500)
-
 
 class AlertResponse(BaseModel):
     id: int
@@ -144,7 +114,6 @@ class AlertResponse(BaseModel):
     created_at: datetime
     description: str = ""
 
-
 class AlertEventResponse(BaseModel):
     id: int
     alert_id: int
@@ -154,11 +123,8 @@ class AlertEventResponse(BaseModel):
     emailed: bool
     created_at: datetime
 
-
-# --- Backtest sandbox ------------------------------------------------
-
-
 class SandboxRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     ticker: str = Field(min_length=1, max_length=10)
     start_date: date | None = None
     end_date: date | None = None

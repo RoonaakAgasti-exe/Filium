@@ -133,8 +133,62 @@ class TestHealth:
 
         assert body["status"] == "ok"
         assert body["database"]["connected"] is True
-        assert set(body["integrations"]) == {"openai", "alpaca", "news", "email"}
+        # live_quotes/fmp are reported apart from alpaca so the UI can tell
+        # "no live prices" from "no brokerage account" — only the first of
+        # those actually degrades anything.
+        assert set(body["integrations"]) == {
+            "openai", "llm", "alpaca", "news", "email", "live_quotes", "fmp",
+            "embeddings",
+        }
+        # `llm` carries which provider is actually answering, because the
+        # text model is no longer necessarily OpenAI — it is any endpoint
+        # speaking the chat-completions format. `openai` stays as the
+        # boolean "is prose available at all" the frontend already reads.
+        assert set(body["integrations"]["llm"]) == {"configured", "model", "endpoint"}
+        assert body["integrations"]["llm"]["configured"] == body["integrations"]["openai"]
+        # `embeddings` is the odd one out: a provider name, not a boolean,
+        # because retrieval never fully switches off — it drops to the local
+        # model. `openai` being false only means answers stop being prose.
+        assert body["integrations"]["embeddings"] in ("openai", "local")
         assert body["version"] == main.app.version
+
+    def test_names_the_live_embedding_model_not_just_the_provider(
+            self, client, monkeypatch):
+        # The other half of a 409 CorpusMismatch: that error names the model
+        # the corpus was built with, and this says what would embed a query
+        # today. Comparing them is the whole diagnosis.
+        @contextmanager
+        def fake_connection():
+            yield FakeConn({"SELECT 1": [(1,)]})
+
+        monkeypatch.setattr(main.db, "connection", fake_connection)
+
+        body = client.get("/health").json()
+
+        assert body["embeddings"]["provider"] in ("openai", "local")
+        assert body["embeddings"]["model"]
+        assert isinstance(body["embeddings"]["dimension"], int)
+
+    def test_reports_an_unknown_embedding_model_instead_of_500ing_on_it(
+            self, client, monkeypatch):
+        # `dimension()` refuses a model it has no width for, which is the
+        # right call at ingestion time and the wrong one here: /health is
+        # where you look to find out you've misconfigured it, so it has to
+        # survive being misconfigured.
+        @contextmanager
+        def fake_connection():
+            yield FakeConn({"SELECT 1": [(1,)]})
+
+        monkeypatch.setattr(main.db, "connection", fake_connection)
+        monkeypatch.setattr(
+            main.embeddings.config, "EMBEDDING_PROVIDER", "local")
+        monkeypatch.setattr(
+            main.embeddings.config, "LOCAL_EMBEDDING_MODEL", "some/unlisted-model")
+
+        response = client.get("/health")
+
+        assert response.status_code == 200
+        assert "Unknown embedding dimension" in response.json()["embeddings"]["error"]
 
     def test_still_returns_200_when_the_database_is_unreachable(self, client, monkeypatch):
         # Deliberate: a 5xx here makes a load balancer pull the container

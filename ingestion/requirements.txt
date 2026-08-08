@@ -2,5 +2,15 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
-openai==1.54.0
+# Must match backend/requirements.txt and stay >= 1.55.3 — see the long
+# note there. 1.54.0 was pinned here too, and it breaks on any fresh
+# install: httpx is an unpinned transitive dependency, so pip resolves
+# httpx >= 0.28, which removed the `proxies` argument that openai <= 1.55.2
+# passes to httpx.Client. This path is now reachable from ingestion, which
+# embeds through backend/embeddings.py.
+openai==1.109.1
+
+# Not optional. This is what makes keyless ingestion work: with no
+# OPENAI_API_KEY, backend/embeddings.py falls back to a local model, and
+# without this package there is no embedding provider at all.
 sentence-transformers==3.2.1

@@ -26,6 +26,7 @@ Usage:
 import argparse
 import os
 import sys
+import time
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -45,6 +46,15 @@ REQUEST_TIMEOUT = 30
 MAX_HEADLINE_CHARS = 500
 MAX_SUMMARY_CHARS = 2000
 
+# Finnhub answers company-news with at most ~250 items per call and fills
+# that budget from the most recent end of the range, so one request for a
+# year returns the last week and silently drops the other 51. Asking in
+# windows is the only way to actually reach back. See _finnhub_window.
+FINNHUB_WINDOW_DAYS = 7
+FINNHUB_PAGE_CAP = 230          # treat a window at/over this as truncated
+FINNHUB_MIN_WINDOW_DAYS = 1
+FINNHUB_REQUEST_PAUSE = 1.1     # free tier allows 60 calls/min
+
 
 def _looks_real(value: str) -> bool:
     return bool(value) and not value.lower().startswith("your_")
@@ -63,10 +73,8 @@ def _clean(text: str | None, limit: int) -> str | None:
 #    url: str|None, source: str|None}
 
 
-def fetch_from_finnhub(ticker: str, start: date, end: date) -> list[dict]:
-    if not _looks_real(FINNHUB_API_KEY):
-        raise RuntimeError("FINNHUB_API_KEY not configured")
-
+def _finnhub_window(ticker: str, start: date, end: date) -> list[dict]:
+    """One raw company-news call. Returns parsed articles for [start, end]."""
     resp = requests.get(
         "https://finnhub.io/api/v1/company-news",
         params={
@@ -82,8 +90,6 @@ def fetch_from_finnhub(ticker: str, start: date, end: date) -> list[dict]:
 
     if not isinstance(payload, list):
         raise RuntimeError(f"Unexpected Finnhub response: {str(payload)[:200]}")
-    if not payload:
-        raise RuntimeError(f"Finnhub returned no articles for {ticker}")
 
     articles = []
     for a in payload:
@@ -99,6 +105,69 @@ def fetch_from_finnhub(ticker: str, start: date, end: date) -> list[dict]:
             "source": a.get("source"),
         })
     return articles
+
+
+def fetch_from_finnhub(ticker: str, start: date, end: date) -> list[dict]:
+    """
+    A year of per-company news, fetched in windows.
+
+    Finnhub caps company-news at roughly 250 items per call and fills that
+    budget newest-first, so a single call for `--days 365` comes back
+    holding only the last few days — which is not an error, produces no
+    warning, and looks exactly like "this ticker had 250 articles". The
+    damage lands two steps later: sentiment_scores ends up with a handful
+    of rows, every older training row gets the 0.0 fill, and the
+    "sentiment-augmented" LSTM is a baseline model wearing a hat.
+
+    So the range is walked in FINNHUB_WINDOW_DAYS chunks. Any window that
+    comes back at the cap is itself suspect — a busy week for NVDA can
+    exceed 250 on its own — so it gets halved and re-requested until it
+    either fits under the cap or bottoms out at a single day.
+    """
+    if not _looks_real(FINNHUB_API_KEY):
+        raise RuntimeError("FINNHUB_API_KEY not configured")
+
+    # Keyed by (date, headline) — the same story is syndicated to several
+    # outlets, and overlapping sub-windows can return it twice besides.
+    collected: dict[tuple[date, str], dict] = {}
+    truncated_days = 0
+
+    def collect(win_start: date, win_end: date) -> None:
+        nonlocal truncated_days
+
+        time.sleep(FINNHUB_REQUEST_PAUSE)
+        articles = _finnhub_window(ticker, win_start, win_end)
+
+        span_days = (win_end - win_start).days + 1
+        if len(articles) >= FINNHUB_PAGE_CAP and span_days > FINNHUB_MIN_WINDOW_DAYS:
+            midpoint = win_start + timedelta(days=span_days // 2)
+            collect(win_start, midpoint - timedelta(days=1))
+            collect(midpoint, win_end)
+            return
+
+        # Bottomed out at one day and still at the cap: this day genuinely
+        # has more news than the API will hand over. Nothing to do but say
+        # so rather than let it read as complete coverage.
+        if len(articles) >= FINNHUB_PAGE_CAP:
+            truncated_days += 1
+
+        for article in articles:
+            collected.setdefault((article["published_date"], article["headline"]), article)
+
+    window_start = start
+    while window_start <= end:
+        window_end = min(window_start + timedelta(days=FINNHUB_WINDOW_DAYS - 1), end)
+        collect(window_start, window_end)
+        window_start = window_end + timedelta(days=1)
+
+    if truncated_days:
+        print(f"  note: {truncated_days} day(s) hit Finnhub's per-call cap; "
+              f"those days are sampled, not complete")
+
+    if not collected:
+        raise RuntimeError(f"Finnhub returned no articles for {ticker}")
+
+    return sorted(collected.values(), key=lambda a: a["published_date"])
 
 
 def fetch_from_newsapi(ticker: str, start: date, end: date) -> list[dict]:
