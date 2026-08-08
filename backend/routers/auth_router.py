@@ -1,4 +1,5 @@
-"""routers/auth_router.py — /auth/register and /auth/login."""
+# auth_router.py — API router for authentication.
+pass
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg2.extensions import connection as PgConnection

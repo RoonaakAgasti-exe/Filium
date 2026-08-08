@@ -1,3 +1,4 @@
+// PublicTicker.jsx — Publicly shareable ticker prediction page.
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, ArrowLeft, ExternalLink } from 'lucide-react';

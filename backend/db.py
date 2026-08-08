@@ -1,10 +1,5 @@
-"""
-db.py
-
-Shared database connection pool for the FastAPI app. Using a pool
-instead of one connection per request avoids the overhead of a fresh
-TCP + auth handshake on every API call.
-"""
+# db.py — Database connection and session management.
+pass
 
 import logging
 import os
@@ -26,12 +21,8 @@ _pool: pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
 
 def init_pool() -> pool.ThreadedConnectionPool:
-    """
-    Creates the pool on first use rather than at import time. Importing
-    this module must not require a reachable database — otherwise the
-    whole app fails to import when Postgres is briefly down, and tests
-    that never touch the DB can't run at all.
-    """
+    pass
+
     global _pool
     if _pool is not None:
         return _pool
@@ -51,10 +42,8 @@ def close_pool() -> None:
 
 @contextmanager
 def connection():
-    """
-    Context-managed connection for use outside FastAPI's dependency
-    system (scripts, background jobs, startup checks).
-    """
+    pass
+
     p = init_pool()
     conn = p.getconn()
     try:
@@ -66,7 +55,7 @@ def connection():
         _return(p, conn)
 
 def get_conn():
-    """FastAPI dependency — yields a connection, always returns it to the pool."""
+    pass
     p = init_pool()
     try:
         conn = p.getconn()
@@ -83,16 +72,8 @@ def get_conn():
         _return(p, conn)
 
 def _return(p: pool.ThreadedConnectionPool, conn) -> None:
-    """
-    Roll back before handing the connection back. Without this, a request
-    that raised mid-transaction leaves the connection in
-    InFailedSqlTransaction — and because it goes straight back into the
-    pool, the *next* unrelated request to draw it gets
-    "current transaction is aborted, commands ignored until end of
-    transaction block" for no visible reason. Endpoints commit explicitly,
-    so an unconditional rollback here only ever discards work that was
-    never meant to land.
-    """
+    pass
+
     try:
         conn.rollback()
     except Exception:
@@ -109,7 +90,7 @@ def _return(p: pool.ThreadedConnectionPool, conn) -> None:
         logger.warning("Failed to return connection to the pool")
 
 def fetch_all(conn, sql: str, params: tuple = ()) -> list[dict]:
-    """Runs a query and returns rows as dicts keyed by column name."""
+    pass
     cur = conn.cursor()
     try:
         cur.execute(sql, params)
@@ -125,12 +106,8 @@ def fetch_one(conn, sql: str, params: tuple = ()) -> dict | None:
     return rows[0] if rows else None
 
 def to_vector_literal(embedding) -> str:
-    """
-    pgvector accepts '[1,2,3]'; psycopg2 renders a Python list as the
-    Postgres *array* literal '{1,2,3}', which `::vector` then refuses with
-    "operator does not exist: vector <=> numeric[]". Every embedding
-    bound into SQL has to go through here first.
-    """
+    pass
+
     values = getattr(embedding, "tolist", None)
     if callable(values):
         embedding = embedding.tolist()

@@ -1,4 +1,5 @@
-"""routers/watchlist.py — /watchlist endpoints."""
+# watchlist.py — API router for user watchlists.
+pass
 
 from fastapi import APIRouter, Depends, status
 from psycopg2.extensions import connection as PgConnection
@@ -27,7 +28,7 @@ def get_watchlist(user_id: int = Depends(get_current_user_id),
 @router.get("/detailed")
 def get_watchlist_detailed(user_id: int = Depends(get_current_user_id),
                            conn: PgConnection = Depends(get_conn)):
-    """Watchlist rows enriched with the latest signal and close, for the dashboard."""
+    pass
     cur = conn.cursor()
     try:
         cur.execute(
@@ -71,14 +72,8 @@ def get_watchlist_detailed(user_id: int = Depends(get_current_user_id),
 @router.post("", status_code=status.HTTP_201_CREATED)
 def add_to_watchlist(payload: WatchlistAdd, user_id: int = Depends(get_current_user_id),
                      conn: PgConnection = Depends(get_conn)):
-    """
-    Adds a ticker, creating the `companies` row if it doesn't exist yet.
+    pass
 
-    The original version rejected anything not already ingested, which
-    made the watchlist unusable on a fresh install: the nightly prediction
-    job only runs for watchlisted tickers, so nothing could ever be
-    watchlisted and nothing could ever be predicted.
-    """
     ticker = payload.ticker.strip().upper()
 
     cur = conn.cursor()

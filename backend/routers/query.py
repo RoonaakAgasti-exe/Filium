@@ -1,12 +1,5 @@
-"""
-routers/query.py — RAG endpoints.
-
-  POST /query            single-company (or corpus-wide) question
-  POST /query/peer       one question across several tickers, side by side
-  POST /query/compare    year-over-year diff of one company's filings
-  GET  /query/filings/{ticker}   what's been ingested, for the compare picker
-  GET  /query/history    the signed-in user's past questions
-"""
+# query.py — API router for RAG chat and document querying.
+pass
 
 import logging
 
@@ -23,11 +16,8 @@ logger = logging.getLogger("fincopilot.query")
 router = APIRouter(prefix="/query", tags=["query"])
 
 def _log_query(conn: PgConnection, user_id: int, question: str, result: dict) -> None:
-    """
-    Records the exchange. Deliberately non-fatal: the user already has
-    their answer, and losing a history row is not worth turning a
-    successful response into a 500.
-    """
+    pass
+
     try:
         cur = conn.cursor()
         cur.execute(
@@ -53,11 +43,8 @@ def ask_question(payload: QueryRequest, user_id: int = Depends(get_current_user_
 @router.post("/peer")
 def ask_peer_question(payload: PeerQueryRequest, user_id: int = Depends(get_current_user_id),
                       conn: PgConnection = Depends(get_conn)):
-    """
-    Multi-company question. `tickers_missing` in the response names any
-    requested company with nothing ingested, so a partial answer is never
-    mistaken for a complete one.
-    """
+    pass
+
     result = rag.answer_peer_query(conn, payload.question, payload.tickers)
     _log_query(conn, user_id, payload.question, result)
     return result
@@ -65,10 +52,8 @@ def ask_peer_question(payload: PeerQueryRequest, user_id: int = Depends(get_curr
 @router.post("/compare")
 def compare_filings(payload: CompareFilingsRequest, user_id: int = Depends(get_current_user_id),
                     conn: PgConnection = Depends(get_conn)):
-    """
-    Year-over-year filing comparison, e.g. "How did the risk factors
-    change?". Defaults to the two most recent filings for the ticker.
-    """
+    pass
+
     result = rag.compare_filings(
         conn,
         payload.ticker,
@@ -81,7 +66,7 @@ def compare_filings(payload: CompareFilingsRequest, user_id: int = Depends(get_c
 
 @router.get("/filings/{ticker}")
 def list_filings(ticker: str, conn: PgConnection = Depends(get_conn)):
-    """Ingested filings for a ticker — powers the comparison date pickers."""
+    pass
     return {"ticker": ticker.upper(), "filings": rag.list_filings(conn, ticker)}
 
 @router.get("/history")

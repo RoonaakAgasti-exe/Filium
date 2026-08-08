@@ -1,4 +1,5 @@
-"""routers/companies.py — company reference data."""
+# companies.py — API router for company data.
+pass
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg2.extensions import connection as PgConnection
@@ -9,7 +10,7 @@ router = APIRouter(prefix="/companies", tags=["companies"])
 
 @router.get("/{ticker}")
 def get_company(ticker: str, conn: PgConnection = Depends(get_conn)):
-    """Basic company metadata plus how much has been ingested for RAG."""
+    pass
     ticker = ticker.upper()
     cur = conn.cursor()
     try:

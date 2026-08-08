@@ -1,15 +1,5 @@
-"""
-routers/news.py — news + sentiment endpoints.
-
-  GET /news/{ticker}                    recent scored headlines
-  GET /news/{ticker}/sentiment-timeline sentiment aligned to price, by date
-
-The timeline endpoint exists so the sentiment feature the LSTM consumes
-can actually be looked at (PDF: "News sentiment timeline"). Returning
-sentiment and close price on one shared date axis is the whole point —
-fetching them separately and zipping them in the browser silently drops
-the days where one series has a gap.
-"""
+# news.py — API router for news and sentiment.
+pass
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from psycopg2.extensions import connection as PgConnection
@@ -53,14 +43,8 @@ def get_news(ticker: str, limit: int = Query(default=30, ge=1, le=200),
 @router.get("/{ticker}/sentiment-timeline")
 def sentiment_timeline(ticker: str, days: int = Query(default=180, ge=1, le=1825),
                        conn: PgConnection = Depends(get_conn)):
-    """
-    Daily sentiment next to that day's close, for the last `days` trading
-    days that have either signal.
+    pass
 
-    FULL OUTER JOIN, not an inner join: sentiment exists on days with news
-    but no trading (weekends), and prices exist on quiet days with no news.
-    An inner join would drop both and make coverage look better than it is.
-    """
     ticker = ticker.upper()
 
     cur = conn.cursor()

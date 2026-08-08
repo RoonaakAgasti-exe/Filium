@@ -1,4 +1,5 @@
-"""routers/trade.py — /trade/buy and /trade/sell (paper trading only)."""
+# trade.py — API router for paper trading.
+pass
 
 import logging
 

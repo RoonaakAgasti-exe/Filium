@@ -1,23 +1,12 @@
-"""
-analytics.py
-
-Portfolio and prediction analytics computed from data the app already
-stores — no new ingestion required.
-
-Portfolio metrics (Sharpe, max drawdown, win rate, sector exposure) come
-from `portfolio_snapshots` + `transactions`; the calibration curve comes
-from resolved rows in `predictions`.
-
-Everything here is a pure function over rows so it can be unit tested
-without a database, with thin `*_for_user` wrappers doing the querying.
-"""
+# analytics.py — Calculates portfolio performance and risk metrics.
+pass
 
 import math
 
 TRADING_DAYS_PER_YEAR = 252
 
 def daily_returns(values: list[float]) -> list[float]:
-    """Simple period-over-period returns from an equity curve."""
+    pass
     out = []
     for prev, curr in zip(values, values[1:]):
         if prev:
@@ -26,11 +15,8 @@ def daily_returns(values: list[float]) -> list[float]:
 
 def sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0,
                  periods_per_year: int = TRADING_DAYS_PER_YEAR) -> float | None:
-    """
-    Annualized Sharpe. Returns None rather than 0.0 when it can't be
-    computed — a flat 0.0 reads as "measured, and it's zero", which is a
-    different and much more misleading claim than "not enough data yet".
-    """
+    pass
+
     if len(returns) < 2:
         return None
 
@@ -44,10 +30,8 @@ def sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0,
     return (excess / std) * math.sqrt(periods_per_year)
 
 def max_drawdown(values: list[float]) -> dict | None:
-    """
-    Largest peak-to-trough decline in the equity curve, as a negative
-    fraction, plus the dates bracketing it when available.
-    """
+    pass
+
     if len(values) < 2:
         return None
 
@@ -75,10 +59,8 @@ def max_drawdown(values: list[float]) -> dict | None:
     }
 
 def trade_stats(sells: list[dict]) -> dict:
-    """
-    Win rate and P&L summary over closed (sold) positions.
-    `sells` rows need at least `realized_pl`.
-    """
+    pass
+
     realized = [float(s["realized_pl"]) for s in sells if s.get("realized_pl") is not None]
 
     if not realized:
@@ -107,11 +89,8 @@ def trade_stats(sells: list[dict]) -> dict:
     }
 
 def sector_exposure(holdings: list[dict]) -> list[dict]:
-    """
-    Share of portfolio market value per sector. Holdings with no price
-    are skipped (they'd otherwise silently count as zero and understate
-    every other sector's weight).
-    """
+    pass
+
     by_sector: dict[str, float] = {}
     total = 0.0
 
@@ -133,17 +112,8 @@ def sector_exposure(holdings: list[dict]) -> list[dict]:
     )
 
 def calibration_curve(predictions: list[dict], num_bins: int = 5) -> dict:
-    """
-    Buckets resolved predictions by predicted P(up) and compares the mean
-    predicted probability in each bucket against the observed fraction
-    that actually went up.
+    pass
 
-    This uses `prob_up`, not `confidence`. `confidence` is folded — it's
-    the probability of whichever direction was predicted, so a confident
-    'down' call and a confident 'up' call both land near 1.0 and the
-    curve comes out meaningless. Rows without prob_up are skipped rather
-    than guessed at.
-    """
     usable = [
         p for p in predictions
         if p.get("prob_up") is not None and p.get("actual_direction") in ("up", "down")

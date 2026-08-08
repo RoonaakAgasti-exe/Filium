@@ -1,3 +1,4 @@
+// Alerts.jsx — Alerts management and events page.
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Zap, MessageSquare } from 'lucide-react';
 import Layout from '../components/Layout';

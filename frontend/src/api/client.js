@@ -1,3 +1,4 @@
+// client.js — API client for backend communication.
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 function getToken() {

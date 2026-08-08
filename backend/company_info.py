@@ -1,32 +1,5 @@
-"""
-company_info.py
-
-Resolves a ticker's display name and sector, so `companies` holds
-something more useful than the ticker repeated back.
-
-Every writer of that table — the price, news and filing ingesters, and
-`market_data.ensure_company` — exists to satisfy a foreign key, so each
-one inserted `(ticker, ticker, NULL)` and left a comment saying the name
-would be "backfilled later". Nothing ever backfilled it. Two features
-were quietly living on that placeholder: `/portfolio/analytics` bucketed
-every holding into "Unclassified" because `sector` was always NULL, and
-every screen that shows a company name showed the ticker twice.
-
-Sources, in the same falls-through order the rest of the app uses:
-
-    1. FMP's profile endpoint  (free key, covers any listed symbol)
-    2. A static seed table     (no key, covers the demo universe)
-
-The seed table is not a placeholder for the real thing — it is the tier
-that keeps the empty-`.env` promise. Without it a clone with no keys at
-all has a sector breakdown that reads "Unclassified: 100%", which looks
-like a broken feature rather than an unconfigured one. It is deliberately
-small: the tickers this project ships demo data for, plus the benchmark.
-
-Lookups are cached per process and never raise. A company row that keeps
-its placeholder name is a cosmetic problem; a trade that 500s because a
-profile lookup timed out is not.
-"""
+# company_info.py — Company metadata and fundamentals.
+pass
 
 import logging
 import threading
@@ -61,7 +34,7 @@ def _from_seed(ticker: str) -> dict | None:
     return {"name": seed[0], "sector": seed[1], "cik": None}
 
 def _from_fmp(ticker: str) -> dict | None:
-    """Company profile from FMP. Returns None without a key, or on a miss."""
+    pass
     if not config.FMP_ENABLED:
         return None
 
@@ -90,12 +63,8 @@ def _from_fmp(ticker: str) -> dict | None:
     return {"name": name, "sector": sector, "cik": cik}
 
 def fetch_profile(ticker: str) -> dict | None:
-    """
-    Best-effort {name, sector, cik} for a ticker, or None if no tier knows it.
+    pass
 
-    Never raises: every caller is enriching a row that already exists and
-    is already usable without this.
-    """
     ticker = ticker.upper()
 
     with _cache_lock:
@@ -118,18 +87,13 @@ def fetch_profile(ticker: str) -> dict | None:
     return dict(profile) if profile else None
 
 def clear_cache() -> None:
-    """Drops every cached profile. Used by tests."""
+    pass
     with _cache_lock:
         _cache.clear()
 
 def needs_enrichment(conn, ticker: str) -> bool:
-    """
-    True when the stored row is still the placeholder the FK-satisfying
-    inserts write — no sector, and a name that is just the ticker.
+    pass
 
-    Checked before going to the network so a populated row costs one
-    indexed primary-key read and nothing else.
-    """
     ticker = ticker.upper()
     cur = conn.cursor()
     try:
@@ -144,19 +108,8 @@ def needs_enrichment(conn, ticker: str) -> bool:
     return not sector or not name or name.strip().upper() == ticker
 
 def enrich(conn, ticker: str) -> bool:
-    """
-    Fills in a company's name/sector/cik if they're still placeholders.
+    pass
 
-    Returns True if the row was updated. COALESCE on every column so this
-    can never blank out a value a better source already wrote — including
-    the `cik` that the SEC ingester sets and neither tier here reports
-    reliably.
-
-    Does not commit: callers are already inside a transaction that is
-    about to write the thing this row exists to support (a trade, a
-    watchlist entry), and enrichment should ride along with it rather than
-    committing separately and leaving the two able to disagree.
-    """
     ticker = ticker.upper()
     if not needs_enrichment(conn, ticker):
         return False
@@ -187,13 +140,8 @@ def enrich(conn, ticker: str) -> bool:
     return updated
 
 def backfill_all(conn) -> dict:
-    """
-    Enriches every company row that still looks like a placeholder.
+    pass
 
-    Used by the nightly scheduler and by `python backend/company_info.py`,
-    so an existing database picks names and sectors up without anyone
-    having to re-ingest anything.
-    """
     cur = conn.cursor()
     try:
         cur.execute(

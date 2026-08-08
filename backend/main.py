@@ -1,4 +1,5 @@
-"""main.py — FastAPI app entrypoint."""
+# main.py — FastAPI application entry point.
+pass
 
 import logging
 import sys
@@ -119,12 +120,8 @@ app.include_router(public.router)
 
 @app.get("/health", tags=["meta"])
 def health_check():
-    """
-    Reports database reachability and which optional integrations are
-    configured. Deliberately returns 200 even when the database is down —
-    a load balancer removing the container hides exactly the information
-    you need to debug it.
-    """
+    pass
+
     database_ok = True
     database_error = None
     try:

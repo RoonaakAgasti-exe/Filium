@@ -1,4 +1,5 @@
-"""models.py — Pydantic schemas for request/response validation."""
+# models.py — Pydantic data models for the API.
+pass
 
 from datetime import date, datetime
 

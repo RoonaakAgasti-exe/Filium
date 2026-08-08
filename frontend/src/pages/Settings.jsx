@@ -1,3 +1,4 @@
+// Settings.jsx — User settings page.
 import { useEffect, useState } from 'react';
 import { RotateCcw, ShieldCheck, Zap } from 'lucide-react';
 import Layout from '../components/Layout';

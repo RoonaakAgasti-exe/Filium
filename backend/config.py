@@ -1,12 +1,5 @@
-"""
-config.py
-
-One place that reads the environment, so every module agrees on what is
-configured and what isn't. The `*_ENABLED` flags exist because this app
-is built to run with any subset of its optional integrations present:
-missing an OpenAI key should disable the chat feature with a clear
-message, not crash the process or 500 an unrelated endpoint.
-"""
+# config.py — Application configuration and environment variables.
+pass
 
 import os
 
@@ -24,13 +17,8 @@ def _get_bool(name: str, default: bool = False) -> bool:
     return raw in ("1", "true", "yes", "on")
 
 def _looks_real(value: str) -> bool:
-    """
-    Treats the placeholder values shipped in .env.example as "not set".
-    Copying .env.example to .env and forgetting to edit it is the single
-    most common way this app gets misconfigured, and a placeholder key
-    produces a confusing 401 from the provider rather than an obvious
-    "you haven't configured this yet".
-    """
+    pass
+
     if not value:
         return False
     lowered = value.lower()
@@ -101,7 +89,7 @@ STARTING_CASH = float(_get("STARTING_CASH", "100000") or 100000)
 GUEST_EMAIL_DOMAINS = ("paper.fincopilot.app", "paper.fincopilot.local")
 
 def is_guest_email(address: str | None) -> bool:
-    """True for the synthetic addresses minted for browser-local paper accounts."""
+    pass
     if not address:
         return False
     return address.lower().endswith(tuple(f"@{d}" for d in GUEST_EMAIL_DOMAINS))
@@ -109,7 +97,7 @@ def is_guest_email(address: str | None) -> bool:
 EDGAR_USER_AGENT = _get("EDGAR_USER_AGENT", "FinCopilot dev dev@example.com")
 
 def integration_status() -> dict:
-    """Surfaced at /health so a deployment can be checked without guessing."""
+    pass
     import embeddings
 
     return {

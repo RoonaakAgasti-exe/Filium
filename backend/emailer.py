@@ -1,14 +1,5 @@
-"""
-emailer.py
-
-Optional SMTP delivery for watchlist alerts.
-
-Alerts are always written to `alert_events` and shown in the app's
-notification centre; email is strictly an additional channel. If SMTP
-isn't configured — or the send fails — the alert is still recorded and
-visible, and `send_email` just reports False. Nothing about alerting
-depends on having mail working.
-"""
+# emailer.py — Sends email notifications.
+pass
 
 import logging
 import smtplib
@@ -22,7 +13,7 @@ def is_configured() -> bool:
     return config.EMAIL_ENABLED
 
 def send_email(to_address: str, subject: str, body: str) -> bool:
-    """Returns True if the message was handed off to the SMTP server."""
+    pass
     if not config.EMAIL_ENABLED:
         logger.debug("SMTP not configured; skipping email to %s", to_address)
         return False

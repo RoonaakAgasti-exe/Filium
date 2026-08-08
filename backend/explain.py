@@ -1,16 +1,5 @@
-"""
-explain.py
-
-Generates the short "why did this trade happen?" note attached to each
-paper trade (PDF: "Explain-the-trade"), tying the ML half of the project
-(the prediction and its sentiment feature) to the RAG half (what the
-filings actually say).
-
-Generation is best-effort by design. The trade has already been committed
-by the time this runs, so a missing OpenAI key, a provider outage, or a
-slow response must never surface as a failed trade — the caller gets
-`None` and the UI simply shows no rationale.
-"""
+# explain.py — Generates AI explanations for trades.
+pass
 
 import logging
 
@@ -32,7 +21,7 @@ Rules:
 """
 
 def gather_context(conn, ticker: str) -> dict:
-    """Latest prediction and sentiment for a ticker, for the prompt and the audit row."""
+    pass
     context: dict = {"prediction": None, "sentiment": None, "recent_close": None}
 
     cur = conn.cursor()
@@ -116,21 +105,8 @@ def _build_prompt(action: str, ticker: str, shares: float, price: float,
 
 def template_explanation(action: str, ticker: str, shares: float, price: float,
                          triggered_by_prediction: bool, context: dict) -> str:
-    """
-    The no-LLM explanation: state the signal, sentiment and price the trade
-    was placed against, without prose.
+    pass
 
-    Every fact in here is already loaded by `gather_context` for the audit
-    row, so the LLM was never the source of the information — only of the
-    sentences. Without this the feature degraded to nothing at all: a
-    deployment with no key (or, as happens far more often, a key that has
-    run out of credit) recorded no explanation, `/trade/explanation/{id}`
-    404'd for every trade, and the UI showed an empty panel that is
-    indistinguishable from a bug. Saying the same facts flatly is worth
-    much more than saying nothing, and it keeps the honest-metrics
-    principle the rest of the app holds to: no model is in the loop, so
-    nothing here can be invented.
-    """
     verb = "Bought" if action == "buy" else "Sold"
     lines = [f"{verb} {shares:g} share(s) of {ticker} at ${price:,.2f}."]
 
@@ -166,13 +142,8 @@ def template_explanation(action: str, ticker: str, shares: float, price: float,
 
 def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: float,
                   price: float, triggered_by_prediction: bool) -> str | None:
-    """
-    Generates and stores the explanation.
+    pass
 
-    Falls back to a deterministic summary of the same context when no LLM
-    is available, so the feature degrades to plainer language rather than
-    to nothing — the same way rag.py answers extractively without a key.
-    """
     context = gather_context(conn, ticker)
     prompt = _build_prompt(action, ticker, shares, price, triggered_by_prediction, context)
 

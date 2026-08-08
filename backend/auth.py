@@ -1,10 +1,5 @@
-"""
-auth.py
-
-Password hashing (bcrypt) and JWT issuing/verification for
-/auth/register and /auth/login, plus a FastAPI dependency
-(get_current_user) that other routers use to require login.
-"""
+# auth.py — JWT authentication and user management.
+pass
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -20,7 +15,7 @@ import config
 logger = logging.getLogger("fincopilot.auth")
 
 def _jwt_secret_configured(value: str) -> bool:
-    """Treat .env.example placeholders the same as unset."""
+    pass
     if not value:
         return False
     lowered = value.lower()
@@ -91,11 +86,8 @@ def get_user_by_email(conn: PgConnection, email: str):
     return {"id": row[0], "email": row[1], "hashed_password": row[2]}
 
 def create_user(conn: PgConnection, email: str, password: str) -> dict:
-    """
-    Creates the user and their starting wallet in one transaction — a user
-    without a wallet row can't trade, and every trade path would have to
-    special-case that state forever.
-    """
+    pass
+
     hashed = hash_password(password)
     cur = conn.cursor()
     try:

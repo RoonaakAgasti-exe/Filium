@@ -1,18 +1,5 @@
-"""
-alerts_engine.py
-
-Evaluates standing alert rules against the latest predictions, prices and
-sentiment, records anything that fires in `alert_events`, and optionally
-emails the user.
-
-Called from two places: the nightly scheduler (ml/scheduler.py) and the
-"check now" button in the app. Both go through `evaluate_all_alerts`, so
-there is exactly one definition of when a rule fires.
-
-Rules are a fixed set of shapes rather than free-form expressions. That's
-what makes natural-language alert creation safe: the LLM's job is to pick
-a shape and a threshold, not to emit code that later gets evaluated.
-"""
+# alerts_engine.py — Evaluates and triggers user alerts.
+pass
 
 import logging
 import re
@@ -93,10 +80,8 @@ def _latest_sentiment(conn, ticker: str) -> dict | None:
     return {"date": row[0], "score": float(row[1])}
 
 def evaluate_rule(conn, alert: dict) -> str | None:
-    """
-    Returns the alert message if the rule fires, else None.
-    `alert` needs: ticker, rule_type, threshold.
-    """
+    pass
+
     ticker = alert["ticker"]
     rule_type = alert["rule_type"]
     threshold = float(alert["threshold"]) if alert.get("threshold") is not None else None
@@ -170,7 +155,7 @@ def _already_fired_today(alert: dict, today: date) -> bool:
     return last_fired >= today
 
 def record_event(conn, alert: dict, message: str, send_email: bool = True) -> dict:
-    """Writes the alert_event, stamps last_fired_at, and optionally emails."""
+    pass
     cur = conn.cursor()
     try:
         cur.execute(
@@ -212,14 +197,8 @@ def record_event(conn, alert: dict, message: str, send_email: bool = True) -> di
 
 def evaluate_all_alerts(conn, user_id: int | None = None, force: bool = False,
                         send_email: bool = True) -> list[dict]:
-    """
-    Evaluates every active alert (optionally scoped to one user) and
-    returns the events that fired.
+    pass
 
-    `force=False` suppresses a rule that already fired today — otherwise
-    a persistent condition like "sentiment below -0.2" would re-notify on
-    every single scheduler run until the sentiment happened to move.
-    """
     sql = [
         "SELECT id, user_id, ticker, rule_type, threshold, natural_language, last_fired_at",
         "FROM alerts WHERE is_active = TRUE",
@@ -289,7 +268,7 @@ _TICKER_RE = re.compile(r"\$([A-Za-z]{1,5})\b|\b([A-Z]{1,5})\b")
 _NUMBER_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*(%?)")
 
 def _extract_ticker(text: str) -> str | None:
-    """First $TICKER, else the first all-caps token that isn't an English word."""
+    pass
     for match in _TICKER_RE.finditer(text):
         dollar, bare = match.group(1), match.group(2)
         if dollar:
@@ -299,17 +278,8 @@ def _extract_ticker(text: str) -> str | None:
     return None
 
 def parse_alert_text(text: str) -> dict:
-    """
-    Keyword parser for alert requests, used when no LLM is available.
+    pass
 
-    The rule vocabulary is five fixed shapes, which is small enough to
-    match on directly — the LLM was always choosing from this same menu,
-    never writing anything that gets evaluated. So the keyless path loses
-    tolerance for unusual phrasing, not capability, and when the phrasing
-    is too unusual it raises rather than guessing.
-
-    Raises ValueError with a message naming what it could not work out.
-    """
     lowered = text.lower()
     ticker = _extract_ticker(text)
     if not ticker:
@@ -361,16 +331,8 @@ def parse_alert_text(text: str) -> dict:
     )
 
 def parse_natural_language_alert(text: str) -> dict:
-    """
-    Turns "notify me if NVDA's sentiment turns negative" into
-    {ticker: NVDA, rule_type: sentiment_below, threshold: 0}.
+    pass
 
-    Uses the LLM when one is configured, because it handles phrasing the
-    keyword parser will not. Falls back to `parse_alert_text` otherwise,
-    so the feature degrades to stricter phrasing rather than to a 503 —
-    which is what it used to do on any deployment without a key, or with a
-    key that had run out of credit.
-    """
     import llm
 
     if not llm.is_configured():

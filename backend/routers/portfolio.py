@@ -1,12 +1,5 @@
-"""
-routers/portfolio.py — /portfolio endpoints.
-
-  GET /portfolio               current holdings + valuation
-  GET /portfolio/history       daily snapshots
-  GET /portfolio/transactions  trade log, with explanations
-  GET /portfolio/analytics     Sharpe, drawdown, win rate, sector exposure
-  GET /portfolio/vs-benchmark  return vs. SPY over the same window
-"""
+# portfolio.py — API router for portfolio management.
+pass
 
 from fastapi import APIRouter, Depends, Query
 from psycopg2.extensions import connection as PgConnection
@@ -105,14 +98,8 @@ def read_transactions(limit: int = Query(default=20, ge=1, le=200),
 @router.get("/analytics")
 def read_analytics(user_id: int = Depends(get_current_user_id),
                    conn: PgConnection = Depends(get_conn)):
-    """
-    Portfolio analytics (PDF: "Portfolio analytics") — Sharpe ratio, max
-    drawdown, per-trade win rate and sector exposure, computed from
-    `portfolio_snapshots` and `transactions`.
+    pass
 
-    Metrics that need a history return null with a `note` explaining what
-    is missing, rather than a zero that reads like a real measurement.
-    """
     portfolio = _load_portfolio(conn, user_id)
     result = analytics.portfolio_analytics(conn, user_id, portfolio["holdings"])
     result["current_value"] = portfolio["total_value"]
@@ -123,11 +110,8 @@ def read_analytics(user_id: int = Depends(get_current_user_id),
 @router.get("/vs-benchmark")
 def read_vs_benchmark(user_id: int = Depends(get_current_user_id),
                       conn: PgConnection = Depends(get_conn)):
-    """
-    Compares portfolio return since the first snapshot against SPY's
-    return over the same period, using price_history if SPY has been
-    ingested as a ticker (treat it like any other watchlisted ticker).
-    """
+    pass
+
     cur = conn.cursor()
     try:
         cur.execute(

@@ -1,23 +1,5 @@
-"""
-backtest_sim.py
-
-Replays the paper strategy over a historical window using predictions
-that were already logged, so a user can ask "what would this have done
-between March and June?" (PDF: "Backtesting sandbox UI").
-
-The strategy is deliberately simple — hold the stock on days the model
-said UP with enough confidence, hold cash otherwise — because the point
-is to show what the signal was worth, not to present a tuned strategy.
-
-Two honesty rules are baked in:
-
-  * A prediction made on day D is acted on using day D's close, and earns
-    day D+1's return. Using day D+1's own prediction to earn day D+1's
-    return is lookahead, and it is the single easiest way to produce a
-    backtest that looks excellent and means nothing.
-  * Buy-and-hold over the identical window is always returned alongside.
-    A strategy return with no benchmark is unfalsifiable.
-"""
+# backtest_sim.py — Runs historical backtests for the sandbox.
+pass
 
 from datetime import date
 
@@ -25,7 +7,7 @@ import analytics
 
 def _load_series(conn, ticker: str, start: date | None, end: date | None,
                  model_version_id: int | None) -> list[dict]:
-    """Joins each trading day's close to that day's prediction, chronologically."""
+    pass
     sql = [
         "SELECT ph.date, ph.close, p.predicted_direction, p.confidence, p.prob_up",
         "FROM price_history ph",
@@ -76,10 +58,8 @@ def _load_series(conn, ticker: str, start: date | None, end: date | None,
 
 def simulate(series: list[dict], starting_cash: float = 10000.0,
              confidence_threshold: float = 0.5, ticker: str = "") -> dict:
-    """
-    Pure simulation over an already-loaded series. Separated from the
-    query so it can be unit tested against handmade data.
-    """
+    pass
+
     if len(series) < 2:
         return {
             "days": len(series),

@@ -1,3 +1,4 @@
+// Leaderboard.jsx — Model leaderboard page.
 import { useEffect, useState } from 'react';
 import { Trophy, TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
 import Layout from '../components/Layout';

@@ -1,10 +1,5 @@
-"""
-routers/sandbox.py — /sandbox (PDF: "Backtesting sandbox UI").
-
-Lets a user pick a ticker, a date range and a confidence threshold, and
-see what the paper strategy would have done — against buy-and-hold over
-the identical window.
-"""
+# sandbox.py — API router for the backtesting sandbox.
+pass
 
 from fastapi import APIRouter, Depends
 from psycopg2.extensions import connection as PgConnection
@@ -31,11 +26,8 @@ def run_backtest(payload: SandboxRequest, user_id: int = Depends(get_current_use
 
 @router.get("/available")
 def available_tickers(conn: PgConnection = Depends(get_conn)):
-    """
-    Tickers with enough data to simulate, and the window each one covers —
-    so the UI can offer real choices instead of letting someone pick a
-    range that returns nothing.
-    """
+    pass
+
     cur = conn.cursor()
     try:
         cur.execute(

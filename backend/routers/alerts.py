@@ -1,17 +1,5 @@
-"""
-routers/alerts.py — watchlist alerts (PDF: "Alerts on watchlist" +
-"Custom alerts via natural language").
-
-  GET    /alerts                 standing rules
-  POST   /alerts                 create a structured rule
-  POST   /alerts/natural         create a rule from plain English
-  DELETE /alerts/{id}            remove a rule
-  PATCH  /alerts/{id}            enable/disable a rule
-  POST   /alerts/check           evaluate now, without waiting for the scheduler
-  GET    /alerts/events          notification feed
-  POST   /alerts/events/read     mark notifications read
-  GET    /alerts/rule-types      supported rule shapes, for the UI form
-"""
+# alerts.py — API router for alerts.
+pass
 
 import logging
 
@@ -64,7 +52,7 @@ _SELECT = (
 
 @router.get("/rule-types")
 def rule_types():
-    """Describes each supported rule so the UI form can be built from the API."""
+    pass
     return {
         "rule_types": [
             {
@@ -132,17 +120,8 @@ def create_alert(payload: AlertCreate, user_id: int = Depends(get_current_user_i
 def create_alert_from_text(payload: NaturalLanguageAlertCreate,
                            user_id: int = Depends(get_current_user_id),
                            conn: PgConnection = Depends(get_conn)):
-    """
-    "notify me if NVDA's sentiment turns negative" -> a structured rule.
+    pass
 
-    The parsed interpretation comes back in the response so the user can
-    confirm the rule means what they intended — an alert that silently
-    means something else is worse than one that failed to be created.
-
-    Works without an LLM: alerts_engine falls back to a keyword parser
-    over the same five rule shapes, so this no longer 503s on a keyless
-    deployment. A phrasing it genuinely can't read still 422s.
-    """
     try:
         parsed = alerts_engine.parse_natural_language_alert(payload.text)
     except ValueError as exc:
@@ -198,13 +177,8 @@ def delete_alert(alert_id: int, user_id: int = Depends(get_current_user_id),
 def check_alerts_now(force: bool = Query(default=True),
                      user_id: int = Depends(get_current_user_id),
                      conn: PgConnection = Depends(get_conn)):
-    """
-    Evaluates this user's alerts immediately.
+    pass
 
-    `force=True` by default because a person pressing "check now" expects
-    an answer about the current state, not silence because the same rule
-    already fired earlier today on the scheduler's run.
-    """
     fired = alerts_engine.evaluate_all_alerts(conn, user_id=user_id, force=force)
     return {"fired": fired, "count": len(fired)}
 
@@ -247,15 +221,8 @@ def list_events(limit: int = Query(default=50, ge=1, le=200), unread_only: bool 
 def mark_events_read(event_ids: list[int] | None = Body(default=None, embed=True),
                      user_id: int = Depends(get_current_user_id),
                      conn: PgConnection = Depends(get_conn)):
-    """
-    Marks the given events read, or all of them when `event_ids` is omitted.
+    pass
 
-    An omitted key and an empty list are deliberately NOT the same thing.
-    `null`/absent means "mark everything", but `[]` means "mark these zero
-    events" — and conflating the two turns a client that computed an empty
-    selection into one that silently wipes the whole unread feed. That is
-    exactly what the previous `if event_ids:` did.
-    """
     cur = conn.cursor()
     try:
         if event_ids is not None:

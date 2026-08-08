@@ -1,3 +1,4 @@
+// Topbar.jsx — Top navigation bar component.
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Bell, ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';

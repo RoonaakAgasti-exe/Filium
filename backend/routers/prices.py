@@ -1,12 +1,5 @@
-"""
-routers/prices.py — /prices endpoints.
-
-Serves real historical OHLCV data out of `price_history` (populated by
-`ingestion/fetch_prices.py`) so the frontend can chart actual price action
-instead of a synthetic line. `/latest` returns the freshest quote any
-configured source can supply — see market_data for the fallback chain —
-so the app still prices a portfolio with a completely empty .env.
-"""
+# prices.py — API router for market prices.
+pass
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from psycopg2.extensions import connection as PgConnection
@@ -62,11 +55,7 @@ def get_price_history(ticker: str, days: int = Query(default=180, ge=1, le=1825)
 
 @router.get("/{ticker}/latest")
 def get_latest_quote(ticker: str, conn: PgConnection = Depends(get_conn)):
-    """
-    Latest price with its provenance. `source` is 'alpaca' for a live
-    trade, 'fmp'/'yahoo' for a delayed quote, or 'price_history' for the
-    last stored close — the UI labels them differently rather than
-    passing a day-old close off as live.
-    """
+    pass
+
     result = market_data.get_price(conn, ticker)
     return {"ticker": ticker.upper(), **result}

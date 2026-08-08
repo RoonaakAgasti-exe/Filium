@@ -1,12 +1,5 @@
-"""
-routers/public.py — unauthenticated, read-only ticker pages
-(PDF: "Social / shareable predictions").
-
-A shareable link showing the current signal and its accuracy track record.
-Deliberately exposes nothing user-specific: no portfolio, no holdings, no
-watchlist, no query history — only ticker-level model output that is the
-same for every visitor.
-"""
+# public.py — API router for public shareable pages.
+pass
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from psycopg2.extensions import connection as PgConnection
@@ -18,7 +11,7 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 @router.get("/tickers")
 def list_public_tickers(conn: PgConnection = Depends(get_conn)):
-    """Every ticker with at least one prediction — the index of shareable pages."""
+    pass
     cur = conn.cursor()
     try:
         cur.execute(

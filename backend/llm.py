@@ -1,14 +1,5 @@
-"""
-llm.py
-
-A single, guarded entry point to the OpenAI API.
-
-Everything LLM-backed in this app (RAG answers, trade explanations,
-natural-language alert parsing) is an enhancement over a feature that
-still works without it. So the rule here is: never raise into a request
-path just because a key is missing or a provider call failed. Callers get
-`None` (or a documented fallback) and decide what to show.
-"""
+# llm.py — Handles LLM integration and prompt execution.
+pass
 
 import json
 import logging
@@ -41,30 +32,11 @@ _PERMANENT_FAILURES = (
 )
 
 class LLMUnavailable(RuntimeError):
-    """No OpenAI key configured, or the provider call failed."""
+    pass
 
 def _note_failure(exc: Exception) -> None:
-    """
-    Latches "the LLM is unusable" when the provider says so permanently.
+    pass
 
-    `config.OPENAI_ENABLED` can only check the *shape* of a key, never its
-    balance, so a key that is expired, revoked, or out of credit reads as
-    configured and then fails on every call. Without this latch each such
-    call still pays the SDK's full retry ladder before giving up, and
-    every LLM-backed path in the app is a request path: asking a question,
-    parsing an alert, buying a share. Measured against an out-of-credit
-    key that was ~3s of dead latency added to each of those, on top of an
-    answer that was going to come from the fallback regardless.
-
-    The fallbacks themselves are what make latching safe: nothing here is
-    load-bearing. RAG answers extractively, alert text is parsed by
-    keyword, and trade explanations are templated — so switching the LLM
-    off early changes when those paths run, never whether they work.
-
-    One process-lifetime latch, not a timed circuit breaker, because the
-    conditions listed above are resolved by a human topping up an account
-    and are not worth re-probing on a schedule. A restart clears it.
-    """
     global _degraded
     text = str(exc).lower()
     if not any(marker in text for marker in _PERMANENT_FAILURES):
@@ -82,34 +54,23 @@ def _note_failure(exc: Exception) -> None:
     )
 
 def degraded_reason() -> str | None:
-    """The provider error that disabled generation, or None. Surfaced at /health."""
+    pass
     return _degraded
 
 def reset_degraded() -> None:
-    """Clears the latch. For tests, and after a credential change."""
+    pass
     global _degraded
     with _degrade_lock:
         _degraded = None
 
 def is_configured() -> bool:
-    """
-    True when generated prose is actually available.
+    pass
 
-    Includes the degraded latch, not just the key, because every caller
-    asks this question to decide whether to bother — and a key that only
-    produces 429s should answer "no" the same way a missing key does.
-    """
     return config.LLM_ENABLED and _degraded is None
 
 def get_client():
-    """
-    Lazily constructs the chat client so importing this module never needs a key.
+    pass
 
-    The `openai` package is used as a wire-protocol client, not as a vendor
-    binding: `base_url` points it at whatever speaks OpenAI-style chat
-    completions. That is what lets this app run on TokenRouter, OpenRouter,
-    Groq, vLLM or Ollama with nothing changed but two environment variables.
-    """
     global _client
     if not config.LLM_ENABLED:
         raise LLMUnavailable(
@@ -132,13 +93,13 @@ def get_client():
     return _client
 
 def reset_client() -> None:
-    """Drops the cached client. For tests, and after a credential change."""
+    pass
     global _client
     _client = None
 
 def complete(prompt: str, system: str | None = None, temperature: float = 0.0,
              max_tokens: int | None = None) -> str:
-    """Plain text completion. Raises LLMUnavailable on any failure."""
+    pass
     client = get_client()
     messages = []
     if system:
@@ -160,16 +121,8 @@ def complete(prompt: str, system: str | None = None, temperature: float = 0.0,
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
 
 def _parse_json_loosely(text: str) -> dict:
-    """
-    Reads a JSON object out of a completion.
+    pass
 
-    `response_format` is an OpenAI extension that many OpenAI-compatible
-    gateways accept and quietly ignore, and that some hosted models reject
-    outright. Either way the model usually still writes valid JSON — just
-    wrapped in a ```json fence or a sentence of preamble. Parsing that back
-    out is the difference between natural-language alerts working on a
-    non-OpenAI provider and silently falling through to keyword matching.
-    """
     text = (text or "").strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
@@ -188,16 +141,8 @@ def _parse_json_loosely(text: str) -> dict:
     return parsed
 
 def complete_json(prompt: str, system: str | None = None) -> dict:
-    """
-    Completion constrained to a JSON object. Used where the result feeds
-    straight into code (alert rule parsing) rather than being shown to a
-    person.
+    pass
 
-    Tries the `response_format` hint first and retries once without it if
-    the provider rejects the parameter, because that rejection says nothing
-    about whether the model can do the task — only that this particular
-    gateway doesn't implement an OpenAI extension.
-    """
     client = get_client()
     messages = []
     if system:
@@ -228,21 +173,15 @@ def complete_json(prompt: str, system: str | None = None) -> dict:
         raise LLMUnavailable(f"LLM request failed: {exc}") from exc
 
 def _rejects_response_format(exc: Exception) -> bool:
-    """
-    True when the provider's error is about the `response_format` parameter
-    itself rather than about the request being wrong.
+    pass
 
-    Matched on the error text because the openai SDK raises the same
-    BadRequestError for every 400, and a gateway that doesn't implement the
-    parameter is not a condition worth failing the feature over.
-    """
     text = str(exc).lower()
     return "response_format" in text or "response format" in text or (
         "json_object" in text
     )
 
 def try_complete(prompt: str, system: str | None = None, **kwargs) -> str | None:
-    """complete(), but swallows failures and returns None. For optional prose."""
+    pass
     try:
         return complete(prompt, system=system, **kwargs)
     except LLMUnavailable as exc:
@@ -250,14 +189,8 @@ def try_complete(prompt: str, system: str | None = None, **kwargs) -> str | None
         return None
 
 def embed(texts: list[str]) -> list[list[float]]:
-    """
-    Embeds a batch of passages.
+    pass
 
-    Kept as a thin delegate rather than deleted: embeddings no longer
-    require OpenAI at all (see embeddings.py), but callers outside this
-    module still reach for `llm.embed`, and routing them through here
-    means there is exactly one place that decides which model runs.
-    """
     import embeddings
 
     try:
@@ -266,17 +199,8 @@ def embed(texts: list[str]) -> list[list[float]]:
         raise LLMUnavailable(str(exc)) from exc
 
 def embed_query(text: str) -> list[float]:
-    """
-    Embeds one search query.
+    pass
 
-    Separate from `embed` because asymmetric models (bge-*, the local
-    default) want queries encoded with an instruction prefix that
-    passages must not get — embedding a query as though it were a passage
-    silently costs recall rather than failing, which is the worst way for
-    it to be wrong. Both paths convert EmbeddingUnavailable to
-    LLMUnavailable so the request surfaces as a 503 with the provider's
-    own explanation, not a 500.
-    """
     import embeddings
 
     try:

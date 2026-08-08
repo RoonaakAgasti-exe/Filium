@@ -1,3 +1,4 @@
+// Chat.jsx — RAG chat interface page.
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import Layout from '../components/Layout';

@@ -1,3 +1,4 @@
+// Sandbox.jsx — Backtesting sandbox interface.
 import { useEffect, useState } from 'react';
 import { Play, BarChart3 } from 'lucide-react';
 import Layout from '../components/Layout';

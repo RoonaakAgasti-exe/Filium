@@ -1,16 +1,5 @@
-"""
-wallet.py
-
-Core buy/sell/portfolio-valuation logic, kept separate from the FastAPI
-router so it can be tested directly against a database without going
-through HTTP or needing Alpaca's live API.
-
-Every mutation locks the wallet row with SELECT ... FOR UPDATE before
-reading the balance it is about to modify. Read-then-write without the
-lock lets two concurrent buys both observe the same starting cash and
-both succeed, overdrawing the account — which is easy to hit here
-because the frontend fires trades from two different pages.
-"""
+# wallet.py — Manages paper trading ledger and cash balances.
+pass
 
 import logging
 from datetime import date
@@ -83,12 +72,8 @@ def _lock_holding(cur, user_id: int, ticker: str) -> dict | None:
 
 def buy_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
                price: float, triggered_by_prediction: bool = False) -> dict:
-    """
-    Deducts cost from cash, updates (or creates) the holding with a
-    weighted-average cost basis, and logs the transaction. Raises
-    InsufficientFundsError without committing anything if the user
-    can't afford it.
-    """
+    pass
+
     if shares <= 0:
         raise ValueError("shares must be positive")
     if price <= 0:
@@ -151,15 +136,8 @@ def buy_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
 
 def sell_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
                 price: float, triggered_by_prediction: bool = False) -> dict:
-    """
-    Adds proceeds to cash, reduces the holding (deleting it if it hits
-    zero), and logs the transaction along with the realized P&L for that
-    sale. Raises InsufficientSharesError without committing anything if
-    the user doesn't own enough shares.
+    pass
 
-    Cost basis is NOT recalculated on a sell — averaging only applies
-    when adding to a position; selling just draws down share count.
-    """
     if shares <= 0:
         raise ValueError("shares must be positive")
     if price <= 0:
@@ -216,11 +194,8 @@ def sell_shares(conn: PgConnection, user_id: int, ticker: str, shares: float,
     }
 
 def get_portfolio(conn: PgConnection, user_id: int, current_prices: dict[str, float]) -> dict:
-    """
-    current_prices: {ticker: latest_price} — caller fetches these
-    (e.g. via market_data.get_prices) since this module has no network
-    access of its own, keeping it testable without live data.
-    """
+    pass
+
     cash = get_cash_balance(conn, user_id)
 
     cur = conn.cursor()
@@ -266,10 +241,8 @@ def get_portfolio(conn: PgConnection, user_id: int, current_prices: dict[str, fl
     }
 
 def deposit_cash(conn: PgConnection, user_id: int, amount: float, *, mode: str = "add") -> float:
-    """
-    Adds cash or sets the balance outright. Used by /wallet/deposit so a
-    paper account can be topped up without minting a new guest identity.
-    """
+    pass
+
     if amount <= 0:
         raise ValueError("amount must be positive")
     if mode not in ("add", "set"):

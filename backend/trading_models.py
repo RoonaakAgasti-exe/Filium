@@ -1,4 +1,5 @@
-"""trading_models.py — Pydantic schemas for the paper-trading endpoints."""
+# trading_models.py — Defines ML models used for predictions.
+pass
 
 from pydantic import BaseModel, Field
 

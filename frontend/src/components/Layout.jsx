@@ -1,3 +1,4 @@
+// Layout.jsx — Main application layout wrapper.
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, MessageCircleMore, LineChart, WalletCards, Settings as SettingsIcon, RotateCcw,

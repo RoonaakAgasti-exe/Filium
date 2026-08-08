@@ -1,3 +1,4 @@
+// Portfolio.jsx — Portfolio analytics and holdings page.
 import { useEffect, useMemo, useState } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,

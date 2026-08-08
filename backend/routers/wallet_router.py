@@ -1,4 +1,5 @@
-"""routers/wallet_router.py — virtual cash management (no broker required)."""
+# wallet_router.py — API router for wallet and cash management.
+pass
 
 from typing import Literal
 
@@ -20,10 +21,8 @@ class WalletDepositRequest(BaseModel):
 @router.post("/deposit")
 def deposit(payload: WalletDepositRequest, user_id: int = Depends(get_current_user_id),
             conn: PgConnection = Depends(get_conn)):
-    """
-    Top up or reset virtual cash on the in-app ledger. Paper trading never
-    touches a brokerage API — this only adjusts the Postgres wallet row.
-    """
+    pass
+
     amount = payload.amount if payload.amount is not None else config.STARTING_CASH
     ensure_wallet(conn, user_id)
     new_balance = deposit_cash(conn, user_id, amount, mode=payload.mode)

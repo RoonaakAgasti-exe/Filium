@@ -1,21 +1,5 @@
-"""
-rag.py
-
-Retrieval-augmented answering over ingested SEC filings and earnings call
-transcripts. This is the canonical implementation — `ingestion/answer_query.py`
-is a thin CLI wrapper around it, and the eval harness imports from here too,
-so the pipeline being measured is exactly the pipeline being served.
-
-Three query shapes are supported:
-  * single/no ticker  — `answer_query`
-  * several tickers   — `answer_peer_query`, one side-by-side answer
-  * one ticker, two filing dates — `compare_filings`, a year-over-year diff
-
-All three retrieve with an exact cosine scan (see the note in schema.sql
-about why the ivfflat index is deliberately deferred), optionally rerank
-with a cross-encoder, and force the model to cite numbered sources that
-are mapped back to real chunk IDs afterwards.
-"""
+# rag.py — Retrieval-Augmented Generation for filings and queries.
+pass
 
 import logging
 import re
@@ -70,19 +54,13 @@ Rules:
 """
 
 class NoDataError(RuntimeError):
-    """Nothing has been ingested that could answer this."""
+    pass
 
 def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
                     top_k: int = TOP_K_RETRIEVE, filing_id: int | None = None,
                     filing_types: list[str] | None = None) -> list[dict]:
-    """
-    Exact cosine-similarity search over filing_chunks, optionally scoped by
-    ticker(s), filing, or filing type.
+    pass
 
-    The embedding is bound as a pgvector literal string, not a Python list:
-    psycopg2 renders a list as a Postgres array, and `'{...}'::vector` fails
-    with "operator does not exist: vector <=> numeric[]".
-    """
     vector_literal = to_vector_literal(query_embedding)
 
     where = []
@@ -121,17 +99,8 @@ def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
         cur.close()
 
 def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
-    """
-    Optional cross-encoder reranking step. Cross-encoders score a
-    (query, chunk) pair jointly rather than comparing precomputed vectors,
-    which usually gives noticeably better precision than raw embedding
-    similarity — at the cost of being slower, so it only runs on the
-    already-narrowed candidate set from retrieve_chunks, not the whole table.
+    pass
 
-    Requires: pip install sentence-transformers
-    Falls back to the embedding-similarity order if the reranker isn't
-    installed, so the pipeline still works without it.
-    """
     if len(chunks) <= 1:
         return chunks[:top_k]
 
@@ -155,14 +124,14 @@ def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
 _reranker = None
 
 def _get_reranker(cross_encoder_cls):
-    """Loads the cross-encoder once — it's ~90MB and slow to construct per request."""
+    pass
     global _reranker
     if _reranker is None:
         _reranker = cross_encoder_cls("cross-encoder/ms-marco-MiniLM-L-6-v2")
     return _reranker
 
 def extract_citation_ids(answer_text: str) -> set[int]:
-    """Pulls out every [N] marker the LLM used, e.g. '[1]' and '[2, 3]'."""
+    pass
     matches = re.findall(r"\[(\d+(?:\s*,\s*\d+)*)\]", answer_text or "")
     ids = set()
     for m in matches:
@@ -173,14 +142,8 @@ def extract_citation_ids(answer_text: str) -> set[int]:
     return ids
 
 def build_source(marker: int, chunk: dict) -> dict:
-    """
-    Shapes one cited chunk for the API.
+    pass
 
-    `excerpt` is the actual retrieved text, which is what makes
-    source-highlighted answers possible — the UI shows the passage the
-    claim came from instead of just a link the reader has to go verify
-    themselves in a 200-page PDF.
-    """
     text = chunk["chunk_text"] or ""
     truncated = len(text) > EXCERPT_CHARS
     return {
@@ -206,7 +169,7 @@ def build_prompt(query: str, chunks: list[dict], label: str = "Excerpts") -> str
     return f"{label}:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {query}"
 
 def _normalise(chunks: list[dict]) -> list[dict]:
-    """retrieve_chunks returns `id`; the rest of this module expects `chunk_id`."""
+    pass
     for c in chunks:
         c.setdefault("chunk_id", c.get("id"))
     return chunks
@@ -218,17 +181,8 @@ EXTRACTIVE_PREAMBLE = (
 )
 
 def extractive_answer(chunks: list[dict]) -> str:
-    """
-    The no-LLM answer: quote what retrieval found and say that's what it is.
+    pass
 
-    Retrieval and generation fail independently — the local embedding
-    model needs no key, so a keyless deployment can still find the right
-    passage in a 200-page 10-K even though it cannot write prose about it.
-    Returning the passages is most of the value of the feature and none of
-    the risk: there is no model in the loop to invent a number, and the
-    citation markers are the same [N] the UI already knows how to resolve
-    to a highlighted source.
-    """
     lines = [EXTRACTIVE_PREAMBLE, ""]
     for i, c in enumerate(chunks, start=1):
         section = c.get("section_label") or "unlabelled section"
@@ -240,14 +194,8 @@ def extractive_answer(chunks: list[dict]) -> str:
     return "\n".join(lines)
 
 def generate_answer(prompt: str, system: str, chunks: list[dict]) -> tuple[str, bool]:
-    """
-    Returns (answer_text, was_generated).
+    pass
 
-    Every caller needs the same two-step: ask the LLM, and if there isn't
-    one, degrade to evidence rather than to an error. `was_generated`
-    travels back to the UI so it can label an extractive answer honestly
-    instead of presenting a list of quotes as if a model had written it.
-    """
     try:
         return llm.complete(prompt, system=system), True
     except llm.LLMUnavailable as exc:
@@ -255,19 +203,13 @@ def generate_answer(prompt: str, system: str, chunks: list[dict]) -> tuple[str, 
         return extractive_answer(chunks), False
 
 def answer_query(conn, query: str, ticker: str | None = None) -> dict:
-    """Single-company (or corpus-wide) question answering."""
+    pass
     tickers = [ticker] if ticker else None
     return _answer(conn, query, tickers, SYSTEM_PROMPT)
 
 def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
-    """
-    Multi-company question answering (PDF: "Multi-company / peer queries").
+    pass
 
-    Retrieval runs per ticker rather than as one pooled top-k. A pooled
-    search lets the most verbose company dominate the context window and
-    crowd the others out entirely, which produces an answer that quietly
-    covers two of the four companies asked about.
-    """
     tickers = [t.upper() for t in tickers if t and t.strip()]
     if not tickers:
         raise ValueError("At least one ticker is required for a peer query.")
@@ -357,17 +299,8 @@ def list_filings(conn, ticker: str) -> list[dict]:
 def compare_filings(conn, ticker: str, question: str,
                     earlier_filing_id: int | None = None,
                     later_filing_id: int | None = None) -> dict:
-    """
-    Answers "how did X change year over year?" by retrieving the passages
-    most relevant to `question` from two separate filings and asking the
-    model to diff them.
+    pass
 
-    Retrieval is scoped to one filing at a time. Searching both at once
-    and hoping for balanced coverage doesn't work — the two filings are
-    near-duplicates of each other, so a pooled top-k routinely returns
-    the same passage twice from whichever filing happens to score
-    marginally higher, and there is nothing to compare.
-    """
     ticker = ticker.upper()
     filings = list_filings(conn, ticker)
 

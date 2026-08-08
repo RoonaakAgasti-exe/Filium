@@ -1,13 +1,5 @@
-"""
-routers/predictions.py — /predictions endpoints.
-
-  GET /predictions/leaderboard          model-vs-model live accuracy
-  GET /predictions/models               registered model versions
-  GET /predictions/{ticker}             latest signal
-  GET /predictions/{ticker}/history     recent signals, chronological
-  GET /predictions/{ticker}/backtest    accuracy summary
-  GET /predictions/{ticker}/calibration predicted probability vs. reality
-"""
+# predictions.py — API router for AI predictions.
+pass
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from psycopg2.extensions import connection as PgConnection
@@ -45,13 +37,8 @@ def list_models(conn: PgConnection = Depends(get_conn)):
 
 @router.get("/leaderboard")
 def leaderboard(ticker: str | None = None, conn: PgConnection = Depends(get_conn)):
-    """
-    Live accuracy per model version (PDF: "Leaderboard / model versioning").
+    pass
 
-    This is the ablation the README claims, measured on predictions that
-    were logged before their outcome was known — not re-scored on the
-    training split, which is where a flattering number would come from.
-    """
     cur = conn.cursor()
     try:
         cur.execute(
@@ -138,7 +125,7 @@ def get_latest_prediction(ticker: str, model_version_id: int | None = None,
 @router.get("/{ticker}/history")
 def get_prediction_history(ticker: str, limit: int = 30, model_version_id: int | None = None,
                            conn: PgConnection = Depends(get_conn)):
-    """Recent predictions for a ticker, oldest first — powers the accuracy-over-time chart."""
+    pass
     limit = max(1, min(limit, 200))
 
     sql = [
@@ -197,13 +184,8 @@ def get_backtest_summary(ticker: str, model_version_id: int | None = None,
 def get_calibration(ticker: str, bins: int = Query(default=5, ge=2, le=20),
                     model_version_id: int | None = None,
                     conn: PgConnection = Depends(get_conn)):
-    """
-    Calibration curve (PDF: "Prediction confidence and calibration view").
+    pass
 
-    A well-calibrated model that says 70% should be right about 70% of the
-    time. That's a stricter and more honest claim than raw directional
-    accuracy, which a model can hit by always predicting the majority class.
-    """
     return analytics.prediction_calibration(
         conn, ticker=ticker, model_version_id=model_version_id, num_bins=bins
     )

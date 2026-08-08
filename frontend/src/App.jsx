@@ -1,3 +1,4 @@
+// App.jsx — Main React application routing.
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Chat from './pages/Chat';
