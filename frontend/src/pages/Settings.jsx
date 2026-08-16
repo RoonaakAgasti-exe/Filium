@@ -6,7 +6,7 @@ import Topbar from '../components/Topbar';
 import { ensureSession, getUserEmail } from '../api/client';
 import './Settings.css';
 
-const AUTO_INVEST_KEY = 'fincopilot_auto_invest';
+const AUTO_INVEST_KEY = 'filium_auto_invest';
 
 export default function Settings() {
   const [autoInvest, setAutoInvest] = useState(false);

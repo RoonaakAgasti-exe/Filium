@@ -1,14 +1,12 @@
 # rag.py — Retrieval-Augmented Generation for filings and queries.
 pass
-
 import logging
 import re
-
 import embeddings
 import llm
 from db import to_vector_literal
 
-logger = logging.getLogger("fincopilot.rag")
+logger = logging.getLogger("filium.rag")
 
 TOP_K_RETRIEVE = 8
 TOP_K_FINAL = 4
@@ -56,16 +54,11 @@ Rules:
 class NoDataError(RuntimeError):
     pass
 
-def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
-                    top_k: int = TOP_K_RETRIEVE, filing_id: int | None = None,
-                    filing_types: list[str] | None = None) -> list[dict]:
+def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None, top_k: int = TOP_K_RETRIEVE, filing_id: int | None = None, filing_types: list[str] | None = None) -> list[dict]:
     pass
-
     vector_literal = to_vector_literal(query_embedding)
-
     where = []
     params: list = [vector_literal]
-
     if tickers:
         where.append("f.ticker = ANY(%s)")
         params.append([t.upper() for t in tickers])
@@ -75,10 +68,8 @@ def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
     if filing_types:
         where.append("f.filing_type = ANY(%s)")
         params.append(filing_types)
-
     where_clause = ("WHERE " + " AND ".join(where)) if where else ""
     params.append(top_k)
-
     sql = f"""
         SELECT fc.id, fc.chunk_text, fc.section_label, f.ticker, f.filing_type,
                f.filing_date, f.source_url, f.id AS filing_id,
@@ -89,7 +80,6 @@ def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
         ORDER BY distance
         LIMIT %s
     """
-
     cur = conn.cursor()
     try:
         cur.execute(sql, tuple(params))
@@ -100,16 +90,13 @@ def retrieve_chunks(conn, query_embedding, tickers: list[str] | None = None,
 
 def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
     pass
-
     if len(chunks) <= 1:
         return chunks[:top_k]
-
     try:
         from sentence_transformers import CrossEncoder
     except ImportError:
         logger.debug("Rerank skipped: sentence-transformers not installed")
         return chunks[:top_k]
-
     try:
         model = _get_reranker(CrossEncoder)
         pairs = [(query, c["chunk_text"]) for c in chunks]
@@ -117,8 +104,7 @@ def rerank_chunks(query: str, chunks: list[dict], top_k: int) -> list[dict]:
     except Exception as exc:
         logger.warning("Reranker failed, falling back to embedding order: %s", exc)
         return chunks[:top_k]
-
-    scored = sorted(zip(chunks, scores), key=lambda x: x[1], reverse=True)
+    scored = sorted(zip(chunks, scores), key = lambda x: x[1], reverse = True)
     return [c for c, _ in scored[:top_k]]
 
 _reranker = None
@@ -143,7 +129,6 @@ def extract_citation_ids(answer_text: str) -> set[int]:
 
 def build_source(marker: int, chunk: dict) -> dict:
     pass
-
     text = chunk["chunk_text"] or ""
     truncated = len(text) > EXCERPT_CHARS
     return {
@@ -156,7 +141,7 @@ def build_source(marker: int, chunk: dict) -> dict:
         "chunk_id": chunk["chunk_id"] if "chunk_id" in chunk else chunk["id"],
         "excerpt": text[:EXCERPT_CHARS] + ("…" if truncated else ""),
         "excerpt_truncated": truncated,
-        "distance": float(chunk["distance"]) if chunk.get("distance") is not None else None,
+        "distance": float(chunk["distance"]) if chunk.get("distance") is not None else None
     }
 
 def build_prompt(query: str, chunks: list[dict], label: str = "Excerpts") -> str:
@@ -164,8 +149,7 @@ def build_prompt(query: str, chunks: list[dict], label: str = "Excerpts") -> str
     for i, c in enumerate(chunks, start=1):
         blocks.append(
             f"[{i}] (from {c['ticker']} {c['filing_type']}, {c['filing_date']}, "
-            f"section: {c.get('section_label') or 'unlabelled'})\n{c['chunk_text']}"
-        )
+            f"section: {c.get('section_label') or 'unlabelled'})\n{c['chunk_text']}")
     return f"{label}:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {query}"
 
 def _normalise(chunks: list[dict]) -> list[dict]:
@@ -177,14 +161,12 @@ def _normalise(chunks: list[dict]) -> list[dict]:
 EXTRACTIVE_PREAMBLE = (
     "No answer-writing model is configured, so this is the raw evidence "
     "rather than a written answer — the passages below are the ones that "
-    "matched your question most closely, in rank order."
-)
+    "matched your question most closely, in rank order.")
 
 def extractive_answer(chunks: list[dict]) -> str:
     pass
-
     lines = [EXTRACTIVE_PREAMBLE, ""]
-    for i, c in enumerate(chunks, start=1):
+    for i, c in enumerate(chunks, start = 1):
         section = c.get("section_label") or "unlabelled section"
         snippet = " ".join((c["chunk_text"] or "").split())[:400]
         lines.append(
@@ -195,7 +177,6 @@ def extractive_answer(chunks: list[dict]) -> str:
 
 def generate_answer(prompt: str, system: str, chunks: list[dict]) -> tuple[str, bool]:
     pass
-
     try:
         return llm.complete(prompt, system=system), True
     except llm.LLMUnavailable as exc:
@@ -209,35 +190,27 @@ def answer_query(conn, query: str, ticker: str | None = None) -> dict:
 
 def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
     pass
-
     tickers = [t.upper() for t in tickers if t and t.strip()]
     if not tickers:
         raise ValueError("At least one ticker is required for a peer query.")
-
     embeddings.assert_matches_corpus(conn)
     embedding = llm.embed_query(query)
-
     per_ticker = max(2, TOP_K_FINAL // max(1, len(tickers)) + 1)
     collected: list[dict] = []
     covered: list[str] = []
-
     for t in tickers:
         candidates = _normalise(retrieve_chunks(conn, embedding, [t], TOP_K_RETRIEVE))
         if not candidates:
             continue
         covered.append(t)
         collected.extend(rerank_chunks(query, candidates, per_ticker))
-
     if not collected:
         raise NoDataError(
             "No filing data found for any of: " + ", ".join(tickers) +
-            ". Ingest a filing for them first."
-        )
-
+            ". Ingest a filing for them first.")
     prompt = build_prompt(query, collected)
     answer_text, generated = generate_answer(prompt, PEER_SYSTEM_PROMPT, collected)
     cited = extract_citation_ids(answer_text)
-
     return {
         "answer": answer_text,
         "generated": generated,
@@ -245,32 +218,26 @@ def answer_peer_query(conn, query: str, tickers: list[str]) -> dict:
         "all_sources": [build_source(i, c) for i, c in enumerate(collected, start=1)],
         "tickers_requested": tickers,
         "tickers_covered": covered,
-        "tickers_missing": [t for t in tickers if t not in covered],
-    }
+        "tickers_missing": [t for t in tickers if t not in covered]}
 
 def _answer(conn, query: str, tickers: list[str] | None, system_prompt: str) -> dict:
     embeddings.assert_matches_corpus(conn)
     embedding = llm.embed_query(query)
     candidates = _normalise(retrieve_chunks(conn, embedding, tickers, TOP_K_RETRIEVE))
-
     if not candidates:
         scope = f" for {', '.join(tickers)}" if tickers else ""
         raise NoDataError(
             f"No filing data found{scope}. Ingest a filing first: "
-            f"python ingestion/ingest_filing.py <TICKER>"
-        )
-
+            f"python ingestion/ingest_filing.py <TICKER>")
     top_chunks = rerank_chunks(query, candidates, TOP_K_FINAL)
     prompt = build_prompt(query, top_chunks)
     answer_text, generated = generate_answer(prompt, system_prompt, top_chunks)
     cited = extract_citation_ids(answer_text)
-
     return {
         "answer": answer_text,
         "generated": generated,
-        "sources": [build_source(i, c) for i, c in enumerate(top_chunks, start=1) if i in cited],
-        "all_sources": [build_source(i, c) for i, c in enumerate(top_chunks, start=1)],
-    }
+        "sources": [build_source(i, c) for i, c in enumerate(top_chunks, start = 1) if i in cited],
+        "all_sources": [build_source(i, c) for i, c in enumerate(top_chunks, start = 1)]}
 
 def list_filings(conn, ticker: str) -> list[dict]:
     cur = conn.cursor()
@@ -285,34 +252,26 @@ def list_filings(conn, ticker: str) -> list[dict]:
             GROUP BY f.id
             ORDER BY f.filing_date DESC
             """,
-            (ticker.upper(),),
+            (ticker.upper())
         )
         columns = [d[0] for d in cur.description]
         rows = [dict(zip(columns, row)) for row in cur.fetchall()]
     finally:
         cur.close()
-
     for r in rows:
         r["filing_date"] = str(r["filing_date"])
     return rows
 
-def compare_filings(conn, ticker: str, question: str,
-                    earlier_filing_id: int | None = None,
-                    later_filing_id: int | None = None) -> dict:
+def compare_filings(conn, ticker: str, question: str, earlier_filing_id: int | None = None, later_filing_id: int | None = None) -> dict:
     pass
-
     ticker = ticker.upper()
     filings = list_filings(conn, ticker)
-
     if len(filings) < 2 and (earlier_filing_id is None or later_filing_id is None):
         raise NoDataError(
             f"Need at least two ingested filings for {ticker} to compare "
             f"(found {len(filings)}). Ingest another period first, e.g. "
-            f"python ingestion/fetch_filing.py {ticker} --count 2"
-        )
-
+            f"python ingestion/fetch_filing.py {ticker} --count 2")
     by_id = {f["id"]: f for f in filings}
-
     if later_filing_id is None:
         later = filings[0]
     else:
@@ -321,59 +280,42 @@ def compare_filings(conn, ticker: str, question: str,
         earlier = filings[1]
     else:
         earlier = by_id.get(earlier_filing_id)
-
     if earlier is None or later is None:
         raise NoDataError(f"One of the requested filings doesn't belong to {ticker}.")
     if earlier["id"] == later["id"]:
         raise ValueError("Pick two different filings to compare.")
-
     if earlier["filing_date"] > later["filing_date"]:
         earlier, later = later, earlier
-
     embeddings.assert_matches_corpus(conn)
     embedding = llm.embed_query(question)
-
     earlier_chunks = rerank_chunks(
         question,
         _normalise(retrieve_chunks(conn, embedding, [ticker], TOP_K_RETRIEVE, filing_id=earlier["id"])),
-        TOP_K_FINAL,
-    )
+        TOP_K_FINAL)
     later_chunks = rerank_chunks(
         question,
         _normalise(retrieve_chunks(conn, embedding, [ticker], TOP_K_RETRIEVE, filing_id=later["id"])),
-        TOP_K_FINAL,
-    )
-
+        TOP_K_FINAL)
     if not earlier_chunks or not later_chunks:
-        raise NoDataError(
-            "One of the two filings has no indexed content matching that question."
-        )
-
+        raise NoDataError("One of the two filings has no indexed content matching that question.")
     combined = earlier_chunks + later_chunks
     offset = len(earlier_chunks)
-
     earlier_block = "\n\n".join(
         f"[{i}] ({earlier['filing_type']} {earlier['filing_date']}, "
         f"section: {c.get('section_label') or 'unlabelled'})\n{c['chunk_text']}"
-        for i, c in enumerate(earlier_chunks, start=1)
-    )
+        for i, c in enumerate(earlier_chunks, start = 1))
     later_block = "\n\n".join(
         f"[{offset + i}] ({later['filing_type']} {later['filing_date']}, "
         f"section: {c.get('section_label') or 'unlabelled'})\n{c['chunk_text']}"
-        for i, c in enumerate(later_chunks, start=1)
-    )
-
+        for i, c in enumerate(later_chunks, start = 1))
     prompt = (
         f"EARLIER — {ticker} {earlier['filing_type']} filed {earlier['filing_date']}:\n\n"
         f"{earlier_block}\n\n"
         f"LATER — {ticker} {later['filing_type']} filed {later['filing_date']}:\n\n"
         f"{later_block}\n\n"
-        f"Question: {question}"
-    )
-
+        f"Question: {question}")
     answer_text, generated = generate_answer(prompt, COMPARE_SYSTEM_PROMPT, combined)
     cited = extract_citation_ids(answer_text)
-
     return {
         "ticker": ticker,
         "question": question,
@@ -381,12 +323,11 @@ def compare_filings(conn, ticker: str, question: str,
         "generated": generated,
         "earlier_filing": {
             "id": earlier["id"], "filing_type": earlier["filing_type"],
-            "filing_date": earlier["filing_date"], "source_url": earlier["source_url"],
+            "filing_date": earlier["filing_date"], "source_url": earlier["source_url"]
         },
         "later_filing": {
             "id": later["id"], "filing_type": later["filing_type"],
             "filing_date": later["filing_date"], "source_url": later["source_url"],
         },
-        "sources": [build_source(i, c) for i, c in enumerate(combined, start=1) if i in cited],
-        "all_sources": [build_source(i, c) for i, c in enumerate(combined, start=1)],
-    }
+        "sources": [build_source(i, c) for i, c in enumerate(combined, start = 1) if i in cited],
+        "all_sources": [build_source(i, c) for i, c in enumerate(combined, start = 1)]}

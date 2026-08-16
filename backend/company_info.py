@@ -1,20 +1,15 @@
 # company_info.py — Company metadata and fundamentals.
 pass
-
 import logging
 import threading
-
 import requests
-
 import config
 
-logger = logging.getLogger("fincopilot.company_info")
-
+logger = logging.getLogger("filium.company_info")
 TIMEOUT = 6
 
 _cache: dict[str, dict] = {}
 _cache_lock = threading.Lock()
-
 _SEED_PROFILES: dict[str, tuple[str, str]] = {
     "AAPL": ("Apple Inc.", "Technology"),
     "MSFT": ("Microsoft Corporation", "Technology"),
@@ -24,7 +19,7 @@ _SEED_PROFILES: dict[str, tuple[str, str]] = {
     "META": ("Meta Platforms, Inc.", "Communication Services"),
     "AMZN": ("Amazon.com, Inc.", "Consumer Cyclical"),
     "TSLA": ("Tesla, Inc.", "Consumer Cyclical"),
-    "SPY": ("SPDR S&P 500 ETF Trust", "Financial Services"),
+    "SPY": ("SPDR S&P 500 ETF Trust", "Financial Services")
 }
 
 def _from_seed(ticker: str) -> dict | None:
@@ -37,15 +32,12 @@ def _from_fmp(ticker: str) -> dict | None:
     pass
     if not config.FMP_ENABLED:
         return None
-
     resp = requests.get(
         "https://financialmodelingprep.com/stable/profile",
-        params={"symbol": ticker, "apikey": config.FMP_API_KEY},
-        timeout=TIMEOUT,
+        params = {"symbol": ticker, "apikey": config.FMP_API_KEY},
+        timeout = TIMEOUT
     )
-
     payload = resp.json()
-
     if isinstance(payload, dict):
         raise RuntimeError(
             payload.get("Error Message") or payload.get("message")
@@ -53,7 +45,6 @@ def _from_fmp(ticker: str) -> dict | None:
         )
     if not payload:
         return None
-
     row = payload[0]
     name = (row.get("companyName") or "").strip() or None
     sector = (row.get("sector") or "").strip() or None
@@ -64,26 +55,20 @@ def _from_fmp(ticker: str) -> dict | None:
 
 def fetch_profile(ticker: str) -> dict | None:
     pass
-
     ticker = ticker.upper()
-
     with _cache_lock:
         if ticker in _cache:
             cached = _cache[ticker]
             return dict(cached) if cached else None
-
     profile = None
     try:
         profile = _from_fmp(ticker)
     except Exception as exc:
         logger.info("FMP profile lookup failed for %s: %s", ticker, exc)
-
     if profile is None:
         profile = _from_seed(ticker)
-
     with _cache_lock:
         _cache[ticker] = dict(profile) if profile else {}
-
     return dict(profile) if profile else None
 
 def clear_cache() -> None:
@@ -93,7 +78,6 @@ def clear_cache() -> None:
 
 def needs_enrichment(conn, ticker: str) -> bool:
     pass
-
     ticker = ticker.upper()
     cur = conn.cursor()
     try:
@@ -101,7 +85,6 @@ def needs_enrichment(conn, ticker: str) -> bool:
         row = cur.fetchone()
     finally:
         cur.close()
-
     if row is None:
         return True
     name, sector = row
@@ -109,15 +92,12 @@ def needs_enrichment(conn, ticker: str) -> bool:
 
 def enrich(conn, ticker: str) -> bool:
     pass
-
     ticker = ticker.upper()
     if not needs_enrichment(conn, ticker):
         return False
-
     profile = fetch_profile(ticker)
     if not profile:
         return False
-
     cur = conn.cursor()
     try:
         cur.execute(
@@ -128,20 +108,17 @@ def enrich(conn, ticker: str) -> bool:
                    cik    = COALESCE(cik, %s)
              WHERE ticker = %s
             """,
-            (profile.get("name"), profile.get("sector"), profile.get("cik"), ticker),
+            (profile.get("name"), profile.get("sector"), profile.get("cik"), ticker)
         )
         updated = cur.rowcount > 0
     finally:
         cur.close()
-
     if updated:
-        logger.info("Enriched %s: name=%r sector=%r",
-                    ticker, profile.get("name"), profile.get("sector"))
+        logger.info("Enriched %s: name = %r sector = %r", ticker, profile.get("name"), profile.get("sector"))
     return updated
 
 def backfill_all(conn) -> dict:
     pass
-
     cur = conn.cursor()
     try:
         cur.execute(
@@ -152,7 +129,6 @@ def backfill_all(conn) -> dict:
         tickers = [r[0] for r in cur.fetchall()]
     finally:
         cur.close()
-
     updated = 0
     for ticker in tickers:
         try:
@@ -161,22 +137,17 @@ def backfill_all(conn) -> dict:
         except Exception:
             logger.exception("Enrichment failed for %s", ticker)
             conn.rollback()
-
     if updated:
         conn.commit()
-
     return {"examined": len(tickers), "updated": updated}
 
 if __name__ == "__main__":
     import sys
     from pathlib import Path
-
     sys.path.insert(0, str(Path(__file__).parent))
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format = "%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     import psycopg2
-
     connection = psycopg2.connect(config.DATABASE_URL)
     try:
         print(backfill_all(connection))

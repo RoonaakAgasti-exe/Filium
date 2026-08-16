@@ -2,7 +2,7 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 function getToken() {
-  return localStorage.getItem('fincopilot_token');
+  return localStorage.getItem('filium_token');
 }
 
 async function request(path, options = {}) {
@@ -86,22 +86,7 @@ export const api = {
       body: JSON.stringify({ ticker, shares, triggered_by_prediction: triggeredByPrediction }),
     }),
 
-  getAlerts: () => request('/alerts'),
-  createAlert: (payload) =>
-    request('/alerts', { method: 'POST', body: JSON.stringify(payload) }),
-  createNaturalAlert: (payload) =>
-    request('/alerts/natural', { method: 'POST', body: JSON.stringify(payload) }),
-  updateAlert: (id, payload) =>
-    request(`/alerts/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
-  deleteAlert: (id) => request(`/alerts/${id}`, { method: 'DELETE' }),
-  checkAlerts: () => request('/alerts/check', { method: 'POST' }),
-  getAlertEvents: () => request('/alerts/events'),
-  markAlertEventsRead: (eventIds) =>
-    request('/alerts/events/read', {
-      method: 'POST',
-      body: JSON.stringify({ event_ids: eventIds }),
-    }),
-  getAlertRuleTypes: () => request('/alerts/rule-types'),
+
 
   getSandboxAvailable: () => request('/sandbox/available'),
   runSandboxBacktest: (payload) =>
@@ -127,11 +112,11 @@ export const api = {
 };
 
 export function setToken(token) {
-  localStorage.setItem('fincopilot_token', token);
+  localStorage.setItem('filium_token', token);
 }
 
 export function clearToken() {
-  localStorage.removeItem('fincopilot_token');
+  localStorage.removeItem('filium_token');
 }
 
 export function isLoggedIn() {
@@ -149,9 +134,9 @@ export function getUserEmail() {
   }
 }
 
-const GUEST_KEY = 'fincopilot_guest_id';
+const GUEST_KEY = 'filium_guest_id';
 
-const GUEST_EMAIL_DOMAIN = 'paper.fincopilot.app';
+const GUEST_EMAIL_DOMAIN = 'paper.filium.app';
 
 function getOrCreateGuestId() {
   let id = localStorage.getItem(GUEST_KEY);

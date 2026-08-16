@@ -1,11 +1,9 @@
 # explain.py — Generates AI explanations for trades.
 pass
-
 import logging
-
 import llm
 
-logger = logging.getLogger("fincopilot.explain")
+logger = logging.getLogger("filium.explain")
 
 SYSTEM_PROMPT = """You explain a single paper trade in two or three sentences,
 for someone learning how model signals translate into decisions.
@@ -23,7 +21,6 @@ Rules:
 def gather_context(conn, ticker: str) -> dict:
     pass
     context: dict = {"prediction": None, "sentiment": None, "recent_close": None}
-
     cur = conn.cursor()
     try:
         cur.execute(
@@ -35,47 +32,43 @@ def gather_context(conn, ticker: str) -> dict:
             WHERE p.ticker = %s
             ORDER BY p.prediction_date DESC, p.id DESC LIMIT 1
             """,
-            (ticker,),
+            (ticker)
         )
         row = cur.fetchone()
         if row:
             context["prediction"] = {
                 "id": row[0], "direction": row[1], "confidence": float(row[2]),
-                "prediction_date": str(row[3]), "target_date": str(row[4]), "model": row[5],
+                "prediction_date": str(row[3]), "target_date": str(row[4]), "model": row[5]
             }
-
         cur.execute(
             "SELECT date, score, article_count FROM sentiment_scores "
             "WHERE ticker = %s AND source = 'news' AND score IS NOT NULL "
             "ORDER BY date DESC LIMIT 1",
-            (ticker,),
+            (ticker)
         )
         row = cur.fetchone()
         if row:
             context["sentiment"] = {
-                "date": str(row[0]), "score": float(row[1]), "article_count": row[2] or 0,
+                "date": str(row[0]), "score": float(row[1]), "article_count": row[2] or 0
             }
-
         cur.execute(
             "SELECT date, close FROM price_history WHERE ticker = %s AND close IS NOT NULL "
             "ORDER BY date DESC LIMIT 1",
-            (ticker,),
+            (ticker)
         )
         row = cur.fetchone()
         if row:
             context["recent_close"] = {"date": str(row[0]), "close": float(row[1])}
     finally:
         cur.close()
-
     return context
 
 def _build_prompt(action: str, ticker: str, shares: float, price: float,
                   triggered_by_prediction: bool, context: dict) -> str:
     lines = [
         f"Trade: {action.upper()} {shares:g} share(s) of {ticker} at ${price:,.2f}.",
-        f"Marked as acting on the model signal: {'yes' if triggered_by_prediction else 'no'}.",
+        f"Marked as acting on the model signal: {'yes' if triggered_by_prediction else 'no'}."
     ]
-
     prediction = context.get("prediction")
     if prediction:
         lines.append(
@@ -85,7 +78,6 @@ def _build_prompt(action: str, ticker: str, shares: float, price: float,
         )
     else:
         lines.append("No model prediction exists for this ticker yet.")
-
     sentiment = context.get("sentiment")
     if sentiment:
         tone = "positive" if sentiment["score"] > 0.05 else (
@@ -96,20 +88,15 @@ def _build_prompt(action: str, ticker: str, shares: float, price: float,
         )
     else:
         lines.append("No news sentiment has been scored for this ticker.")
-
     close = context.get("recent_close")
     if close:
         lines.append(f"Most recent stored close: ${close['close']:,.2f} on {close['date']}.")
-
     return "\n".join(lines)
 
-def template_explanation(action: str, ticker: str, shares: float, price: float,
-                         triggered_by_prediction: bool, context: dict) -> str:
+def template_explanation(action: str, ticker: str, shares: float, price: float, triggered_by_prediction: bool, context: dict) -> str:
     pass
-
     verb = "Bought" if action == "buy" else "Sold"
     lines = [f"{verb} {shares:g} share(s) of {ticker} at ${price:,.2f}."]
-
     prediction = context.get("prediction")
     if prediction:
         direction = prediction["direction"].lower()
@@ -123,7 +110,6 @@ def template_explanation(action: str, ticker: str, shares: float, price: float,
     else:
         lines.append("No model prediction exists for this ticker yet, so the trade "
                      "was not backed by a signal.")
-
     sentiment = context.get("sentiment")
     if sentiment:
         score = sentiment["score"]
@@ -134,30 +120,21 @@ def template_explanation(action: str, ticker: str, shares: float, price: float,
         )
     else:
         lines.append("No news sentiment has been scored for this ticker.")
-
     if triggered_by_prediction:
         lines.append("Marked as acting on the model signal.")
-
     return " ".join(lines)
 
-def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: float,
-                  price: float, triggered_by_prediction: bool) -> str | None:
+def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: float, price: float, triggered_by_prediction: bool) -> str | None:
     pass
-
     context = gather_context(conn, ticker)
     prompt = _build_prompt(action, ticker, shares, price, triggered_by_prediction, context)
-
     text = None
     if llm.is_configured():
-        text = llm.try_complete(prompt, system=SYSTEM_PROMPT, max_tokens=220)
-
+        text = llm.try_complete(prompt, system = SYSTEM_PROMPT, max_tokens = 220)
     if not text:
-        text = template_explanation(action, ticker, shares, price,
-                                    triggered_by_prediction, context)
-
+        text = template_explanation(action, ticker, shares, price, triggered_by_prediction, context)
     prediction_id = (context.get("prediction") or {}).get("id")
     sentiment_score = (context.get("sentiment") or {}).get("score")
-
     cur = conn.cursor()
     try:
         cur.execute(
@@ -165,7 +142,7 @@ def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: f
             "(transaction_id, explanation, prediction_id, sentiment_score) "
             "VALUES (%s, %s, %s, %s) "
             "ON CONFLICT (transaction_id) DO UPDATE SET explanation = EXCLUDED.explanation",
-            (transaction_id, text, prediction_id, sentiment_score),
+            (transaction_id, text, prediction_id, sentiment_score)
         )
         conn.commit()
     except Exception:
@@ -173,5 +150,4 @@ def explain_trade(conn, transaction_id: int, action: str, ticker: str, shares: f
         conn.rollback()
     finally:
         cur.close()
-
     return text

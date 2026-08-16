@@ -1,12 +1,9 @@
 # backtest_sim.py — Runs historical backtests for the sandbox.
 pass
-
 from datetime import date
-
 import analytics
 
-def _load_series(conn, ticker: str, start: date | None, end: date | None,
-                 model_version_id: int | None) -> list[dict]:
+def _load_series(conn, ticker: str, start: date | None, end: date | None, model_version_id: int | None) -> list[dict]:
     pass
     sql = [
         "SELECT ph.date, ph.close, p.predicted_direction, p.confidence, p.prob_up",
@@ -14,7 +11,7 @@ def _load_series(conn, ticker: str, start: date | None, end: date | None,
         "LEFT JOIN LATERAL (",
         "    SELECT predicted_direction, confidence, prob_up",
         "    FROM predictions",
-        "    WHERE ticker = ph.ticker AND prediction_date = ph.date",
+        "    WHERE ticker = ph.ticker AND prediction_date = ph.date"
     ]
     params: list = []
 
@@ -25,7 +22,7 @@ def _load_series(conn, ticker: str, start: date | None, end: date | None,
     sql += [
         "    ORDER BY id DESC LIMIT 1",
         ") p ON TRUE",
-        "WHERE ph.ticker = %s AND ph.close IS NOT NULL",
+        "WHERE ph.ticker = %s AND ph.close IS NOT NULL"
     ]
     params.append(ticker.upper())
 
@@ -44,43 +41,33 @@ def _load_series(conn, ticker: str, start: date | None, end: date | None,
         rows = cur.fetchall()
     finally:
         cur.close()
-
     return [
         {
             "date": r[0],
             "close": float(r[1]),
             "predicted_direction": r[2],
             "confidence": float(r[3]) if r[3] is not None else None,
-            "prob_up": float(r[4]) if r[4] is not None else None,
+            "prob_up": float(r[4]) if r[4] is not None else None
         }
         for r in rows
     ]
 
-def simulate(series: list[dict], starting_cash: float = 10000.0,
-             confidence_threshold: float = 0.5, ticker: str = "") -> dict:
+def simulate(series: list[dict], starting_cash: float = 10000.0, confidence_threshold: float = 0.5, ticker: str = "") -> dict:
     pass
-
     if len(series) < 2:
-        return {
-            "days": len(series),
-            "error": "Need at least two days of price history in this window to simulate.",
-        }
-
+        return {"days": len(series), "error": "Need at least two days of price history in this window to simulate."}
     equity = starting_cash
     curve = []
     trades = []
     in_position = False
     days_in_market = 0
-
     for today, tomorrow in zip(series, series[1:]):
         signal_is_up = (
             today["predicted_direction"] == "up"
             and today["confidence"] is not None
             and today["confidence"] >= confidence_threshold
         )
-
         day_return = (tomorrow["close"] - today["close"]) / today["close"] if today["close"] else 0.0
-
         if signal_is_up:
             equity *= (1 + day_return)
             days_in_market += 1
@@ -93,19 +80,16 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
                 "entry_close": today["close"],
                 "exit_close": tomorrow["close"],
                 "return": day_return,
-                "confidence": today["confidence"],
+                "confidence": today["confidence"]
             })
-
         if signal_is_up != in_position:
             in_position = signal_is_up
-
         curve.append({
             "date": str(tomorrow["date"]),
             "strategy_value": equity,
             "buy_hold_value": starting_cash * (tomorrow["close"] / series[0]["close"]),
-            "in_market": signal_is_up,
+            "in_market": signal_is_up
         })
-
     strategy_returns = [t["return"] for t in trades]
     all_returns = [
         (b["close"] - a["close"]) / a["close"]
@@ -114,14 +98,10 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
 
     strategy_values = [starting_cash] + [c["strategy_value"] for c in curve]
     buy_hold_values = [starting_cash] + [c["buy_hold_value"] for c in curve]
-
     strategy_daily = analytics.daily_returns(strategy_values)
-
     wins = sum(1 for r in strategy_returns if r > 0)
-
     strategy_drawdown = analytics.max_drawdown(strategy_values)
     buy_hold_drawdown = analytics.max_drawdown(buy_hold_values)
-
     predicted_days = sum(1 for d in series[:-1] if d["predicted_direction"] is not None)
 
     return {
@@ -141,36 +121,30 @@ def simulate(series: list[dict], starting_cash: float = 10000.0,
         "trades": trades,
         "winning_days": wins,
         "win_rate": (wins / len(strategy_returns)) if strategy_returns else None,
-        "equity_curve": curve,
+        "equity_curve": curve
     }
 
-def run(conn, ticker: str, start: date | None = None, end: date | None = None,
-        starting_cash: float = 10000.0, confidence_threshold: float = 0.5,
-        model_version_id: int | None = None) -> dict:
+def run(conn, ticker: str, start: date | None = None, end: date | None = None, starting_cash: float = 10000.0, confidence_threshold: float = 0.5, model_version_id: int | None = None) -> dict:
     ticker = ticker.upper()
     series = _load_series(conn, ticker, start, end, model_version_id)
-
     if not series:
         return {
             "ticker": ticker,
             "days": 0,
             "error": f"No price history for {ticker} in that window. "
-                     f"Run: python ingestion/fetch_prices.py {ticker}",
+                     f"Run: python ingestion/fetch_prices.py {ticker}"
         }
-
     result = simulate(series, starting_cash, confidence_threshold, ticker=ticker)
     result.update({
         "ticker": ticker,
         "start_date": str(series[0]["date"]),
         "end_date": str(series[-1]["date"]),
         "confidence_threshold": confidence_threshold,
-        "model_version_id": model_version_id,
+        "model_version_id": model_version_id
     })
-
     if result.get("days_with_prediction") == 0:
         result["note"] = (
             "No predictions exist in this window, so the strategy never entered the "
             "market and its return is 0%. Buy-and-hold is still shown for reference."
         )
-
     return result

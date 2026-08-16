@@ -11,7 +11,7 @@ from auth import get_current_user_id
 from db import get_conn
 from models import CompareFilingsRequest, PeerQueryRequest, QueryRequest, QueryResponse
 
-logger = logging.getLogger("fincopilot.query")
+logger = logging.getLogger("filium.query")
 
 router = APIRouter(prefix="/query", tags=["query"])
 

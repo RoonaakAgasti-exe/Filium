@@ -1,4 +1,3 @@
-"""Test configuration and fixtures."""
 import os
 import sys
 

@@ -1,20 +1,15 @@
 # llm.py — Handles LLM integration and prompt execution.
 pass
-
 import json
 import logging
 import re
 import threading
-
 import config
 
-logger = logging.getLogger("fincopilot.llm")
-
+logger = logging.getLogger("filium.llm")
 _client = None
-
 _degraded: str | None = None
 _degrade_lock = threading.Lock()
-
 _PERMANENT_FAILURES = (
     "insufficient_quota",
     "credit_balance_exhausted",
@@ -28,7 +23,7 @@ _PERMANENT_FAILURES = (
     "insufficient credits",
     "invalid model",
     "model not found",
-    "invalid token",
+    "invalid token"
 )
 
 class LLMUnavailable(RuntimeError):
@@ -36,7 +31,6 @@ class LLMUnavailable(RuntimeError):
 
 def _note_failure(exc: Exception) -> None:
     pass
-
     global _degraded
     text = str(exc).lower()
     if not any(marker in text for marker in _PERMANENT_FAILURES):
@@ -47,11 +41,10 @@ def _note_failure(exc: Exception) -> None:
         _degraded = str(exc)
     logger.warning(
         "OpenAI text generation is unusable (%s). Falling back to extractive "
-        "answers, keyword alert parsing and templated trade explanations for "
+        "answers and templated trade explanations for "
         "the rest of this process. Fix the key or top up the account and "
         "restart to re-enable it.",
-        str(exc)[:200],
-    )
+        str(exc)[:200])
 
 def degraded_reason() -> str | None:
     pass
@@ -65,21 +58,17 @@ def reset_degraded() -> None:
 
 def is_configured() -> bool:
     pass
-
     return config.LLM_ENABLED and _degraded is None
 
 def get_client():
     pass
-
     global _client
     if not config.LLM_ENABLED:
         raise LLMUnavailable(
             "No text-generation model is configured — set LLM_API_KEY "
-            "(and LLM_BASE_URL for a non-OpenAI provider) to enable AI-generated text"
-        )
+            "(and LLM_BASE_URL for a non-OpenAI provider) to enable AI-generated text")
     if _degraded is not None:
         raise LLMUnavailable(f"The text model is configured but unusable: {_degraded}")
-
     if _client is None:
         try:
             from openai import OpenAI
@@ -89,7 +78,6 @@ def get_client():
         if config.LLM_BASE_URL:
             kwargs["base_url"] = config.LLM_BASE_URL
         _client = OpenAI(**kwargs)
-
     return _client
 
 def reset_client() -> None:
@@ -97,22 +85,19 @@ def reset_client() -> None:
     global _client
     _client = None
 
-def complete(prompt: str, system: str | None = None, temperature: float = 0.0,
-             max_tokens: int | None = None) -> str:
+def complete(prompt: str, system: str | None = None, temperature: float = 0.0, max_tokens: int | None = None) -> str:
     pass
     client = get_client()
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-
     try:
         response = client.chat.completions.create(
-            model=config.LLM_MODEL,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+            model = config.LLM_MODEL,
+            messages = messages,
+            temperature = temperature,
+            max_tokens = max_tokens)
         return (response.choices[0].message.content or "").strip()
     except Exception as exc:
         _note_failure(exc)
@@ -122,12 +107,10 @@ _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
 
 def _parse_json_loosely(text: str) -> dict:
     pass
-
     text = (text or "").strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
         text = re.sub(r"\s*```$", "", text).strip()
-
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
@@ -135,35 +118,29 @@ def _parse_json_loosely(text: str) -> dict:
         if not match:
             raise
         parsed = json.loads(match.group(0))
-
     if not isinstance(parsed, dict):
         raise ValueError(f"expected a JSON object, got {type(parsed).__name__}")
     return parsed
 
 def complete_json(prompt: str, system: str | None = None) -> dict:
     pass
-
     client = get_client()
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-
     def _call(use_response_format: bool):
         kwargs = {"model": config.LLM_MODEL, "messages": messages, "temperature": 0}
         if use_response_format:
             kwargs["response_format"] = {"type": "json_object"}
         return client.chat.completions.create(**kwargs)
-
     try:
         try:
             response = _call(True)
         except Exception as exc:
             if not _rejects_response_format(exc):
                 raise
-            logger.info(
-                "Provider rejected response_format; retrying without it: %s", str(exc)[:200]
-            )
+            logger.info("Provider rejected response_format; retrying without it: %s", str(exc)[:200])
             response = _call(False)
         return _parse_json_loosely(response.choices[0].message.content)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -174,25 +151,20 @@ def complete_json(prompt: str, system: str | None = None) -> dict:
 
 def _rejects_response_format(exc: Exception) -> bool:
     pass
-
     text = str(exc).lower()
-    return "response_format" in text or "response format" in text or (
-        "json_object" in text
-    )
+    return "response_format" in text or "response format" in text or ("json_object" in text)
 
 def try_complete(prompt: str, system: str | None = None, **kwargs) -> str | None:
     pass
     try:
-        return complete(prompt, system=system, **kwargs)
+        return complete(prompt, system = system, **kwargs)
     except LLMUnavailable as exc:
         logger.info("Skipping LLM generation: %s", exc)
         return None
 
 def embed(texts: list[str]) -> list[list[float]]:
     pass
-
     import embeddings
-
     try:
         return embeddings.embed_documents(texts)
     except embeddings.EmbeddingUnavailable as exc:
@@ -200,9 +172,7 @@ def embed(texts: list[str]) -> list[list[float]]:
 
 def embed_query(text: str) -> list[float]:
     pass
-
     import embeddings
-
     try:
         return embeddings.embed_query(text)
     except embeddings.EmbeddingUnavailable as exc:

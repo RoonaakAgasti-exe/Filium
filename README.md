@@ -1,4 +1,4 @@
-# FinCopilot
+# Filium
 
 **AI research assistant for SEC filings, with a sentiment-augmented price
 predictor and paper trading.** Ask a company a question, get an answer
@@ -63,7 +63,7 @@ is worth more than a suspiciously perfect one.)*
 ## Repo structure
 
 ```
-fincopilot/
+filium/
 ├── ingestion/          # Phase 1-3: fetch, clean, chunk+embed filings, RAG query
 ├── db/schema.sql        # Phase 2: full Postgres schema (13 tables, pgvector)
 ├── eval/                 # Phase 4: retrieval precision + faithfulness eval harness
@@ -92,7 +92,7 @@ fincopilot/
 ## Quickstart
 
 ```bash
-git clone <your-repo-url> && cd fincopilot
+git clone <your-repo-url> && cd filium
 cp .env.example .env   # works as-is; see below for what keys add
 
 # 1. Ingest a filing — fetch, clean, chunk and embed in one step

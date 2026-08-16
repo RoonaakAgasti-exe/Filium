@@ -1,19 +1,16 @@
 # db.py — Database connection and session management.
 pass
-
 import logging
 import os
 import threading
 from contextlib import contextmanager
-
 from dotenv import load_dotenv
 from psycopg2 import OperationalError, pool
 
 load_dotenv()
+logger = logging.getLogger("filium.db")
 
-logger = logging.getLogger("fincopilot.db")
-
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/fincopilot")
+DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/filium")
 POOL_MIN = int(os.getenv("DB_POOL_MIN", "1"))
 POOL_MAX = int(os.getenv("DB_POOL_MAX", "10"))
 
@@ -22,11 +19,9 @@ _pool_lock = threading.Lock()
 
 def init_pool() -> pool.ThreadedConnectionPool:
     pass
-
     global _pool
     if _pool is not None:
         return _pool
-
     with _pool_lock:
         if _pool is None:
             _pool = pool.ThreadedConnectionPool(POOL_MIN, POOL_MAX, DB_URL)
@@ -43,7 +38,6 @@ def close_pool() -> None:
 @contextmanager
 def connection():
     pass
-
     p = init_pool()
     conn = p.getconn()
     try:
@@ -62,7 +56,6 @@ def get_conn():
     except OperationalError as exc:
         logger.error("Could not check out a database connection: %s", exc)
         raise
-
     try:
         yield conn
     except Exception:
@@ -73,7 +66,6 @@ def get_conn():
 
 def _return(p: pool.ThreadedConnectionPool, conn) -> None:
     pass
-
     try:
         conn.rollback()
     except Exception:
@@ -83,7 +75,6 @@ def _return(p: pool.ThreadedConnectionPool, conn) -> None:
         except Exception:
             pass
         return
-
     try:
         p.putconn(conn)
     except Exception:
@@ -107,7 +98,6 @@ def fetch_one(conn, sql: str, params: tuple = ()) -> dict | None:
 
 def to_vector_literal(embedding) -> str:
     pass
-
     values = getattr(embedding, "tolist", None)
     if callable(values):
         embedding = embedding.tolist()

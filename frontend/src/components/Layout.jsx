@@ -2,7 +2,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, MessageCircleMore, LineChart, WalletCards, Settings as SettingsIcon, RotateCcw,
-  Bell, FlaskConical, Trophy,
+  FlaskConical, Trophy,
 } from 'lucide-react';
 import './Layout.css';
 
@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { to: '/chat', label: 'Ask AI', icon: MessageCircleMore },
   { to: '/dashboard', label: 'Predictions', icon: LineChart },
   { to: '/portfolio', label: 'Portfolio', icon: WalletCards },
-  { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/sandbox', label: 'Sandbox', icon: FlaskConical },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },

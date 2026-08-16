@@ -1,11 +1,10 @@
 # trading_models.py — Defines ML models used for predictions.
 pass
-
 from pydantic import BaseModel, Field
 
 class TradeRequest(BaseModel):
-    ticker: str = Field(min_length=1, max_length=10)
-    shares: float = Field(gt=0, le=1_000_000)
+    ticker: str = Field(min_length = 1, max_length = 10)
+    shares: float = Field(gt = 0, le = 1_000_000)
     triggered_by_prediction: bool = False
     explain: bool = True
 

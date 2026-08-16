@@ -1,4 +1,4 @@
-# FinCopilot Test Suite
+# Filium Test Suite
 
 ```bash
 pip install -r tests/requirements.txt

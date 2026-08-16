@@ -1,9 +1,9 @@
-﻿services:
+services:
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: fincopilot
+      POSTGRES_DB: filium
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
@@ -27,7 +27,7 @@
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/fincopilot
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/filium
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
@@ -51,14 +51,9 @@
       FINNHUB_API_KEY: ${FINNHUB_API_KEY}
       NEWS_API_KEY: ${NEWS_API_KEY}
       FMP_API_KEY: ${FMP_API_KEY}
-      EDGAR_USER_AGENT: ${EDGAR_USER_AGENT:-FinCopilot dev dev@example.com}
+      EDGAR_USER_AGENT: ${EDGAR_USER_AGENT:-Filium dev dev@example.com}
       STARTING_CASH: ${STARTING_CASH:-100000}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM}
-      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+
     volumes:
       - hfcache:/cache/huggingface
     ports:
@@ -96,7 +91,7 @@
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/fincopilot
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/filium
       ALPACA_API_KEY: ${ALPACA_API_KEY}
       ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY}
       ALPACA_DATA_URL: ${ALPACA_DATA_URL:-https://data.alpaca.markets}

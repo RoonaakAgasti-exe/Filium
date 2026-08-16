@@ -19,7 +19,7 @@ from wallet import (
     sell_shares,
 )
 
-logger = logging.getLogger("fincopilot.trade")
+logger = logging.getLogger("filium.trade")
 
 router = APIRouter(prefix="/trade", tags=["trade"])
 

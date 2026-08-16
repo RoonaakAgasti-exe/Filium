@@ -1,8 +1,6 @@
 # config.py — Application configuration and environment variables.
 pass
-
 import os
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,7 +25,7 @@ def _looks_real(value: str) -> bool:
                 or lowered in ("changeme", "change_this_in_production",
                                "generate_a_long_random_string_here"))
 
-DATABASE_URL = _get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/fincopilot")
+DATABASE_URL = _get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/filium")
 JWT_SECRET_KEY = _get("JWT_SECRET_KEY")
 ENVIRONMENT = _get("ENVIRONMENT", "development").lower()
 IS_PRODUCTION = ENVIRONMENT in ("production", "prod", "staging", "stage")
@@ -46,9 +44,7 @@ EMBEDDING_MODEL = _get("EMBEDDING_MODEL", "text-embedding-3-small")
 EMBEDDING_BASE_URL = _get("EMBEDDING_BASE_URL")
 EMBEDDING_API_KEY = _get("EMBEDDING_API_KEY") or (LLM_API_KEY if not LLM_BASE_URL else "")
 
-REMOTE_EMBEDDINGS_AVAILABLE = _looks_real(EMBEDDING_API_KEY) and (
-    bool(EMBEDDING_BASE_URL) or not LLM_BASE_URL
-)
+REMOTE_EMBEDDINGS_AVAILABLE = _looks_real(EMBEDDING_API_KEY) and (bool(EMBEDDING_BASE_URL) or not LLM_BASE_URL)
 
 EMBEDDING_PROVIDER = _get("EMBEDDING_PROVIDER", "auto").lower()
 LOCAL_EMBEDDING_MODEL = _get("LOCAL_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
@@ -72,21 +68,9 @@ NEWS_API_KEY = _get("NEWS_API_KEY")
 FINNHUB_API_KEY = _get("FINNHUB_API_KEY")
 NEWS_ENABLED = _looks_real(NEWS_API_KEY) or _looks_real(FINNHUB_API_KEY)
 
-SMTP_HOST = _get("SMTP_HOST")
-SMTP_PORT = int(_get("SMTP_PORT", "587") or 587)
-SMTP_USER = _get("SMTP_USER")
-SMTP_PASSWORD = _get("SMTP_PASSWORD")
-SMTP_FROM = _get("SMTP_FROM", SMTP_USER)
-SMTP_USE_TLS = _get_bool("SMTP_USE_TLS", True)
-EMAIL_ENABLED = bool(
-    SMTP_HOST and _looks_real(SMTP_HOST)
-    and SMTP_USER and _looks_real(SMTP_USER)
-    and SMTP_FROM and _looks_real(SMTP_FROM)
-)
-
 STARTING_CASH = float(_get("STARTING_CASH", "100000") or 100000)
 
-GUEST_EMAIL_DOMAINS = ("paper.fincopilot.app", "paper.fincopilot.local")
+GUEST_EMAIL_DOMAINS = ("paper.filium.app", "paper.filium.local")
 
 def is_guest_email(address: str | None) -> bool:
     pass
@@ -94,7 +78,7 @@ def is_guest_email(address: str | None) -> bool:
         return False
     return address.lower().endswith(tuple(f"@{d}" for d in GUEST_EMAIL_DOMAINS))
 
-EDGAR_USER_AGENT = _get("EDGAR_USER_AGENT", "FinCopilot dev dev@example.com")
+EDGAR_USER_AGENT = _get("EDGAR_USER_AGENT", "Filium dev dev@example.com")
 
 def integration_status() -> dict:
     pass
@@ -105,12 +89,11 @@ def integration_status() -> dict:
         "llm": {
             "configured": LLM_ENABLED,
             "model": LLM_MODEL,
-            "endpoint": "default (OpenAI)" if not LLM_BASE_URL else LLM_BASE_URL,
+            "endpoint": "default (OpenAI)" if not LLM_BASE_URL else LLM_BASE_URL
         },
         "alpaca": ALPACA_ENABLED,
         "news": NEWS_ENABLED,
-        "email": EMAIL_ENABLED,
         "live_quotes": LIVE_QUOTES_ENABLED,
         "fmp": FMP_ENABLED,
-        "embeddings": embeddings.active_provider(),
+        "embeddings": embeddings.active_provider()
     }

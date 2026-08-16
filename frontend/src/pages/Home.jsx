@@ -12,7 +12,7 @@ import Topbar from '../components/Topbar';
 import { api, getUserEmail } from '../api/client';
 import './Home.css';
 
-const AUTO_INVEST_KEY = 'fincopilot_auto_invest';
+const AUTO_INVEST_KEY = 'filium_auto_invest';
 
 function formatMoney(n, opts = {}) {
   if (n == null) return '—';

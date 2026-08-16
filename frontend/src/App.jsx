@@ -6,7 +6,6 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Portfolio from './pages/Portfolio';
 import Settings from './pages/Settings';
-import Alerts from './pages/Alerts';
 import Sandbox from './pages/Sandbox';
 import Leaderboard from './pages/Leaderboard';
 import PublicTicker from './pages/PublicTicker';
@@ -60,7 +59,6 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/alerts" element={<Alerts />} />
         <Route path="/sandbox" element={<Sandbox />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/public/:ticker" element={<PublicTicker />} />

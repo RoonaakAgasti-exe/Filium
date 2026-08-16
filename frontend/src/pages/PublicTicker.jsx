@@ -58,7 +58,7 @@ export default function PublicTicker() {
     <div className="public-page">
       <header className="public-header">
         <Link to="/" className="public-back">
-          <ArrowLeft size={16} /> FinCopilot
+          <ArrowLeft size={16} /> Filium
         </Link>
         <span className="public-badge">Public track record</span>
       </header>
@@ -135,7 +135,7 @@ export default function PublicTicker() {
             This is a model signal, not investment advice. Past performance does not guarantee future results.
           </p>
           <a href="https://github.com" target="_blank" rel="noreferrer" className="public-link">
-            Built with FinCopilot <ExternalLink size={12} />
+            Built with Filium <ExternalLink size={12} />
           </a>
         </footer>
       </main>
