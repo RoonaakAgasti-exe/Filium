@@ -6,10 +6,6 @@ sourced from their real filings. See a daily up/down signal with an
 honestly-tracked accuracy record. Trade on paper — real prices, fake
 money — and see whether the model's calls actually help.
 
-> For the plain-language "explain it to a child" version of what this
-> project does and how it works, see [`EXPLAINER.md`](EXPLAINER.md).
-> This README is the technical/portfolio-facing version.
-
 ---
 
 ## Results
