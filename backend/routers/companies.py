@@ -10,15 +10,15 @@ def get_company(ticker:str, conn:PgConnection = Depends(get_conn)):
     ticker = ticker.upper()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT ticker, name, sector, cik FROM companies WHERE ticker = %s", ticker)
+        cur.execute("SELECT ticker, name, sector, cik FROM companies WHERE ticker = %s", (ticker,))
         row = cur.fetchone()
         if row is None:
             raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"No company record for {ticker}. Trading will create a stub row; ingest filings to enable chat.")
         cur.execute(
             "SELECT filing_type, filing_date FROM filings WHERE ticker = %s "
-            "ORDER BY filing_date DESC LIMIT 10", ticker)
+            "ORDER BY filing_date DESC LIMIT 10", (ticker,))
         filings = [{"filing_type":r[0], "filing_date":str(r[1])} for r in cur.fetchall()]
-        cur.execute("SELECT COUNT(*) FROM price_history WHERE ticker = %s", ticker)
+        cur.execute("SELECT COUNT(*) FROM price_history WHERE ticker = %s", (ticker,))
         price_rows = cur.fetchone()[0]
     finally:
         cur.close()

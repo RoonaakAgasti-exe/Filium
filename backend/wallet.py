@@ -166,7 +166,7 @@ def get_portfolio(conn: PgConnection, user_id: int, current_prices: dict[str, fl
             "SELECT h.ticker, h.shares, h.avg_cost_basis, c.sector "
             "FROM holdings h LEFT JOIN companies c ON c.ticker = h.ticker "
             "WHERE h.user_id = %s ORDER BY h.ticker",
-            (user_id))
+            (user_id,))
         rows = cur.fetchall()
     finally:
         cur.close()

@@ -70,7 +70,7 @@ def _query_df(conn, sql:str, params:tuple, columns:list[str]) -> pd.DataFrame:
 def load_price_history(conn, ticker:str) -> pd.DataFrame:
     df = _query_df(conn,
         "SELECT date, open, high, low, close, volume FROM price_history "
-        "WHERE ticker = %s AND close IS NOT NULL ORDER BY date", ticker.upper(), ["date", "open", "high", "low", "close", "volume"])
+        "WHERE ticker = %s AND close IS NOT NULL ORDER BY date", (ticker.upper(),), ["date", "open", "high", "low", "close", "volume"])
     if df.empty:
         raise SystemExit(f"No price history for {ticker.upper()}. Ingest it first:\n python ingestion/fetch_prices.py {ticker.upper()} --days 1825")
     df["date"] = pd.to_datetime(df["date"])

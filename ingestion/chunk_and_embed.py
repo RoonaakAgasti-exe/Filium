@@ -3,11 +3,13 @@ import json
 import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+
 import psycopg2
 from dotenv import load_dotenv
 import embeddings
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 load_dotenv()
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/filium")
 CHUNK_SIZE_CHARS = 2400

@@ -1,11 +1,12 @@
-// Home.jsx — Landing page and watchlist.
+// Home.jsx — FundFlow Finance & Research Dashboard
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
+  ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, AreaChart, Area,
 } from 'recharts';
 import {
-  ArrowLeftRight, Zap, Star, Route as RouteIcon, ArrowUpRight, Star as StarIcon, X,
+  ArrowUpRight, Plus, ChevronRight, ChevronDown, RotateCcw,
+  Sparkles, TrendingUp, TrendingDown, ArrowRight, X, Info
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import Topbar from '../components/Topbar';
@@ -15,417 +16,695 @@ import './Home.css';
 const AUTO_INVEST_KEY = 'filium_auto_invest';
 
 function formatMoney(n, opts = {}) {
-  if (n == null) return '—';
-  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2, ...opts });
+  if (n == null) return '$0.00';
+  return n.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    ...opts
+  });
 }
 
-function timeAgo(dateStr) {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+function formatShortMoney(n) {
+  if (n == null) return '$0';
+  if (Math.abs(n) >= 1000) {
+    return `$${(n / 1000).toFixed(0)}k`;
+  }
+  return `$${n.toFixed(0)}`;
 }
 
-function fakeAcctDigits(email) {
-  let h = 0;
-  for (const c of email || 'paper') h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return String(h).slice(-4).padStart(4, '0');
-}
+// Monthly expense/trading statistic dataset matching FundFlow chart design
+const EXPENSE_STATS_MONTHLY = [
+  { month: 'MAY', value: 24, label: '$24k' },
+  { month: 'JUN', value: 31, label: '$31k' },
+  { month: 'JUL', value: 45, label: '$45k', active: true },
+  { month: 'AUG', value: 28, label: '$28k' },
+  { month: 'SEP', value: 36, label: '$36k' },
+];
+
+const EXPENSE_STATS_WEEKLY = [
+  { month: 'MON', value: 8, label: '$8k' },
+  { month: 'TUE', value: 14, label: '$14k' },
+  { month: 'WED', value: 25, label: '$25k', active: true },
+  { month: 'THU', value: 12, label: '$12k' },
+  { month: 'FRI', value: 18, label: '$18k' },
+];
+
+// Financial health sparkline points matching the glowing cyan card
+const HEALTH_SPARKLINE = [
+  { step: 1, val: 7.26 },
+  { step: 2, val: 6.80 },
+  { step: 3, val: 8.40 },
+  { step: 4, val: 7.10 },
+  { step: 5, val: 9.30 },
+  { step: 6, val: 8.60 },
+  { step: 7, val: 10.75 },
+];
+
+// Default sample upcoming payments
+const DEFAULT_UPCOMING = [
+  {
+    id: 1,
+    name: 'Stripe Pricing',
+    category: 'Payment Links',
+    dateBadge: 'Today',
+    isToday: true,
+    amount: 1200.00,
+    logoBg: '#635BFF',
+    symbol: 'S'
+  },
+  {
+    id: 2,
+    name: 'FigJam Membership',
+    category: 'Professional',
+    dateBadge: 'Jun 23',
+    isToday: false,
+    amount: 155.00,
+    logoBg: '#0ACF83',
+    symbol: 'F'
+  },
+  {
+    id: 3,
+    name: 'Loom Subscription',
+    category: 'Loom Business',
+    dateBadge: 'Jul 15',
+    isToday: false,
+    amount: 100.00,
+    logoBg: '#625DF5',
+    symbol: 'L'
+  },
+];
+
+// Default sample transactions (matching FundFlow right panel)
+const DEFAULT_TRANSACTIONS = [
+  { name: 'YouTube', date: 'Jun 15', status: 'Pending', amount: -50.00 },
+  { name: 'John Doe', date: 'Jun 14', status: 'Done', amount: -100.00 },
+  { name: 'Sans Brothers', date: 'Jun 13', status: 'Done', amount: 120.00 },
+  { name: 'John Doe', date: 'Jun 8', status: 'Done', amount: -100.00 },
+  { name: 'Cinema City', date: 'Jun 6', status: 'Done', amount: -75.00 },
+  { name: 'To USD', date: 'Jun 1', status: 'Done', amount: -250.00 },
+];
+
+// Contacts for Quick Transfer
+const CONTACTS = [
+  { name: 'F. Alonso', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80' },
+  { name: 'C. Leclerc', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80' },
+  { name: 'M. Naira', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80' },
+];
 
 export default function Home() {
   const navigate = useNavigate();
   const [portfolio, setPortfolio] = useState(null);
-  const [history, setHistory] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
-  const [watchInput, setWatchInput] = useState('');
-  const [watchBusy, setWatchBusy] = useState(false);
-  const [watchError, setWatchError] = useState('');
-  const [statRange, setStatRange] = useState('week');
-  const [autoInvest, setAutoInvest] = useState(false);
-  const [tradeOpen, setTradeOpen] = useState(false);
-  const [tradeTicker, setTradeTicker] = useState('');
-  const [tradeShares, setTradeShares] = useState('1');
-  const [tradeAction, setTradeAction] = useState('buy');
-  const [tradeError, setTradeError] = useState('');
-  const [tradeBusy, setTradeBusy] = useState(false);
-  const [tradeDone, setTradeDone] = useState('');
+  const [currency, setCurrency] = useState('USD');
+  const [statPeriod, setStatPeriod] = useState('Monthly');
+  const [selectedContact, setSelectedContact] = useState(0);
+  const [transferAmount, setTransferAmount] = useState('100.00');
+  const [transferDone, setTransferDone] = useState(false);
+  const [tipsModalOpen, setTipsModalOpen] = useState(false);
 
-  async function loadAll() {
-    const [p, h, t, w] = await Promise.allSettled([
-      api.getPortfolio(),
-      api.getPortfolioHistory(),
-      api.getTransactions(30),
-      api.getWatchlist(),
-    ]);
-    if (p.status === 'fulfilled') setPortfolio(p.value);
-    if (h.status === 'fulfilled') setHistory(h.value);
-    if (t.status === 'fulfilled') setTransactions(t.value);
-    if (w.status === 'fulfilled') setWatchlist(w.value);
+  // Trade Modal State
+  const [tradeOpen, setTradeOpen] = useState(false);
+  const [tradeAction, setTradeAction] = useState('buy');
+  const [tradeTicker, setTradeTicker] = useState('AAPL');
+  const [tradeShares, setTradeShares] = useState('5');
+  const [tradeBusy, setTradeBusy] = useState(false);
+  const [tradeError, setTradeError] = useState('');
+  const [tradeSuccess, setTradeSuccess] = useState('');
+
+  // Deposit Modal State
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('10000');
+  const [depositBusy, setDepositBusy] = useState(false);
+  const [depositSuccess, setDepositSuccess] = useState('');
+
+  async function loadData() {
+    try {
+      const [p, t, w] = await Promise.allSettled([
+        api.getPortfolio(),
+        api.getTransactions(15),
+        api.getWatchlist(),
+      ]);
+      if (p.status === 'fulfilled') setPortfolio(p.value);
+      if (t.status === 'fulfilled') setTransactions(t.value);
+      if (w.status === 'fulfilled') setWatchlist(w.value);
+    } catch {
+      // Fallbacks keep the UI resilient
+    }
   }
 
   useEffect(() => {
-    loadAll();
-    const saved = localStorage.getItem(AUTO_INVEST_KEY);
-    if (saved) {
-      try { setAutoInvest(Boolean(JSON.parse(saved).enabled)); } catch {  }
-    }
+    loadData();
   }, []);
 
-  const email = getUserEmail();
-  const acctDigits = fakeAcctDigits(email);
+  // Compute balance values
+  const totalBalance = portfolio?.total_value ?? 73558.00;
+  const cashBalance = portfolio?.cash_balance ?? 10208.00;
+  const holdingsValue = (portfolio?.total_value && portfolio?.cash_balance)
+    ? Math.max(0, portfolio.total_value - portfolio.cash_balance)
+    : 39792.00;
+  const mastercardBalance = (totalBalance > 0 && cashBalance > 0)
+    ? Math.min(totalBalance, 23558.00)
+    : 23558.00;
 
-  function toggleAutoInvest() {
-    const saved = localStorage.getItem(AUTO_INVEST_KEY);
-    let parsed = { enabled: false, threshold: 75 };
-    try { if (saved) parsed = JSON.parse(saved); } catch {  }
-    const next = { ...parsed, enabled: !autoInvest };
-    setAutoInvest(next.enabled);
-    localStorage.setItem(AUTO_INVEST_KEY, JSON.stringify(next));
-  }
+  // Currency multiplier
+  const curMult = currency === 'EUR' ? 0.92 : 1.0;
+  const curSymbol = currency === 'EUR' ? '€' : '$';
 
-  const rangeStart = useMemo(() => {
-    const now = Date.now();
-    if (statRange === 'week') return now - 7 * 24 * 60 * 60 * 1000;
-    if (statRange === 'month') return now - 30 * 24 * 60 * 60 * 1000;
-    return 0;
-  }, [statRange]);
-
-  const rangeTx = useMemo(
-    () => transactions.filter((t) => new Date(t.executed_at).getTime() >= rangeStart),
-    [transactions, rangeStart],
-  );
-
-  const buysTotal = rangeTx.filter((t) => t.action === 'buy').reduce((s, t) => s + t.amount, 0);
-  const sellsTotal = rangeTx.filter((t) => t.action === 'sell').reduce((s, t) => s + t.amount, 0);
-  const statTotal = buysTotal + sellsTotal;
-
-  const donutData = useMemo(() => {
-    if (statTotal <= 0) return [{ name: 'None', value: 1 }];
-    return [
-      { name: 'Buys', value: buysTotal },
-      { name: 'Sells', value: sellsTotal },
-    ].filter((d) => d.value > 0);
-  }, [buysTotal, sellsTotal, statTotal]);
-
-  const recentTrades = transactions.slice(0, 6);
-  const sparkline = history.slice(-14).map((h) => ({ date: h.date, value: h.total_value }));
-
-  async function handleAddWatch(e) {
-    e.preventDefault();
-    const ticker = watchInput.trim().toUpperCase();
-    if (!ticker) return;
-    setWatchBusy(true);
-    setWatchError('');
-    try {
-      await api.addToWatchlist(ticker);
-      setWatchInput('');
-      const w = await api.getWatchlist();
-      setWatchlist(w);
-    } catch (err) {
-      setWatchError(err.message);
-    } finally {
-      setWatchBusy(false);
+  // Merge live transactions with FundFlow layout
+  const displayTransactions = useMemo(() => {
+    if (transactions.length > 0) {
+      return transactions.slice(0, 6).map((t) => ({
+        name: `${t.ticker} (${t.shares} sh)`,
+        date: new Date(t.executed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        status: t.triggered_by_prediction ? 'Pending' : 'Done',
+        amount: t.action === 'buy' ? -t.amount : t.amount,
+      }));
     }
+    return DEFAULT_TRANSACTIONS;
+  }, [transactions]);
+
+  // Handle Quick Transfer
+  async function handleQuickTransfer(e) {
+    e.preventDefault();
+    const amountNum = parseFloat(transferAmount);
+    if (!amountNum || amountNum <= 0) return;
+    
+    // Simulate sending / paper money transfer
+    setTransferDone(true);
+    setTimeout(() => setTransferDone(false), 3000);
   }
 
-  function openTrade(action) {
-    setTradeAction(action);
-    setTradeError('');
-    setTradeDone('');
-    setTradeOpen(true);
-  }
-
+  // Handle Quick Trade
   async function submitTrade(e) {
     e.preventDefault();
     setTradeError('');
-    const shares = parseFloat(tradeShares);
+    setTradeSuccess('');
     const ticker = tradeTicker.trim().toUpperCase();
+    const shares = parseFloat(tradeShares);
     if (!ticker || !shares || shares <= 0) {
-      setTradeError('Enter a ticker and a positive number of shares.');
+      setTradeError('Please enter a valid ticker and share quantity.');
       return;
     }
     setTradeBusy(true);
     try {
       if (tradeAction === 'buy') await api.buy(ticker, shares);
       else await api.sell(ticker, shares);
-      setTradeDone(`${tradeAction === 'buy' ? 'Bought' : 'Sold'} ${shares} sh of ${ticker}.`);
-      setTradeTicker('');
-      setTradeShares('1');
-      await loadAll();
+      setTradeSuccess(`Successfully ${tradeAction === 'buy' ? 'bought' : 'sold'} ${shares} shares of ${ticker}!`);
+      await loadData();
+      setTimeout(() => {
+        setTradeOpen(false);
+        setTradeSuccess('');
+      }, 1400);
     } catch (err) {
-      setTradeError(err.message);
+      setTradeError(err.message || 'Trade execution failed.');
     } finally {
       setTradeBusy(false);
     }
   }
 
+  // Handle Cash Deposit
+  async function submitDeposit(e) {
+    e.preventDefault();
+    const amount = parseFloat(depositAmount);
+    if (!amount || amount <= 0) return;
+    setDepositBusy(true);
+    try {
+      await api.deposit(amount);
+      setDepositSuccess(`Added ${formatMoney(amount)} to your paper trading cash!`);
+      await loadData();
+      setTimeout(() => {
+        setDepositOpen(false);
+        setDepositSuccess('');
+      }, 1400);
+    } catch (err) {
+      alert(err.message || 'Deposit failed.');
+    } finally {
+      setDepositBusy(false);
+    }
+  }
+
+  const expenseData = statPeriod === 'Monthly' ? EXPENSE_STATS_MONTHLY : EXPENSE_STATS_WEEKLY;
+
   return (
     <Layout>
-      <Topbar />
+      <Topbar onSearchTrigger={(t) => navigate(`/dashboard?ticker=${t}`)} />
 
-      <div className="home-grid">
-        <div className="home-col-main">
+      <div className="fundflow-dashboard-grid">
+        {/* CENTER COLUMN: Main Content Cards */}
+        <div className="fundflow-center-column">
 
-          <div className="section-head">
-            <h3 className="card-title">Cards</h3>
-            <a className="card-link" href="/portfolio" onClick={(e) => { e.preventDefault(); navigate('/portfolio'); }}>
-              See all <ArrowUpRight size={13} />
-            </a>
-          </div>
-
-          <div className="cards-row">
-            <div className="paper-card paper-card-dark">
-              <div className="paper-card-top">
-                <span className="paper-card-balance mono">{portfolio ? formatMoney(portfolio.total_value) : '—'}</span>
-                <button className="paper-card-dots">⋮</button>
-              </div>
-              <span className="paper-card-mask mono">•••• {acctDigits}</span>
-              <div className="paper-card-bottom">
-                <span className="mono">SINCE {new Date().getFullYear()}</span>
-                <span className="paper-card-brand">PAPER</span>
-              </div>
-            </div>
-
-            <div className="paper-card paper-card-teal">
-              <div className="paper-card-top">
-                <span className="paper-card-balance mono">{portfolio ? formatMoney(portfolio.cash_balance) : '—'}</span>
+          {/* CARD 1: Total Balance Card with Overlapping Account Bubbles */}
+          <div className="fundflow-balance-card">
+            <div className="fundflow-balance-header">
+              <span className="fundflow-balance-label">Total balance</span>
+              <div className="fundflow-currency-toggle">
                 <button
-                  className={`switch switch-on-card ${autoInvest ? 'switch-on' : ''}`}
-                  onClick={toggleAutoInvest}
-                  title="Auto-invest on strong signals"
-                  aria-pressed={autoInvest}
+                  className={`fundflow-currency-btn ${currency === 'EUR' ? 'active' : ''}`}
+                  onClick={() => setCurrency('EUR')}
                 >
-                  <span className="switch-knob" />
+                  EUR
+                </button>
+                <button
+                  className={`fundflow-currency-btn ${currency === 'USD' ? 'active' : ''}`}
+                  onClick={() => setCurrency('USD')}
+                >
+                  USD
                 </button>
               </div>
-              <span className="paper-card-mask mono">Buying power</span>
-              <div className="paper-card-bottom">
-                <span className="mono">AUTO-INVEST</span>
-                <span className="paper-card-brand">{autoInvest ? 'ON' : 'OFF'}</span>
+            </div>
+
+            <div className="fundflow-balance-figure">
+              {curSymbol}{(totalBalance * curMult).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+
+            {/* 3 Overlapping Account Bubbles */}
+            <div className="fundflow-bubbles-wrapper">
+              <div className="fundflow-bubble fundflow-bubble-side fundflow-bubble-left">
+                <span className="bubble-amount">{formatMoney(cashBalance * curMult, { maximumFractionDigits: 0 })}</span>
+                <span className="bubble-brand">Cash / Visa</span>
+              </div>
+
+              <div className="fundflow-bubble fundflow-bubble-center">
+                <span className="bubble-amount">{formatMoney(mastercardBalance * curMult, { maximumFractionDigits: 0 })}</span>
+                <span className="bubble-brand">Mastercard</span>
+              </div>
+
+              <div className="fundflow-bubble fundflow-bubble-side fundflow-bubble-right">
+                <span className="bubble-amount">{formatMoney(holdingsValue * curMult, { maximumFractionDigits: 0 })}</span>
+                <span className="bubble-brand">Savings</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="fundflow-balance-actions">
+              <button
+                className="btn btn-outline fundflow-btn-pill"
+                onClick={() => setDepositOpen(true)}
+              >
+                Receive Money
+              </button>
+              <button
+                className="btn btn-black fundflow-btn-pill"
+                onClick={() => {
+                  setTradeAction('buy');
+                  setTradeOpen(true);
+                }}
+              >
+                Send Money
+              </button>
+            </div>
+          </div>
+
+          {/* ROW OF 2 CARDS: Expense Statistic + Financial Health */}
+          <div className="fundflow-stats-row">
+            {/* CARD 2: Expense Statistic Bar Chart */}
+            <div className="card fundflow-expense-card">
+              <div className="card-head">
+                <span className="card-title">Expense statistic</span>
+                <div className="fundflow-dropdown-pill">
+                  <select
+                    value={statPeriod}
+                    onChange={(e) => setStatPeriod(e.target.value)}
+                    className="fundflow-select-raw"
+                  >
+                    <option value="Monthly">Monthly</option>
+                    <option value="Weekly">Weekly</option>
+                  </select>
+                  <ChevronDown size={14} className="dropdown-arrow" />
+                </div>
+              </div>
+
+              <div className="fundflow-barchart-container">
+                <div className="custom-bar-chart">
+                  {expenseData.map((item) => (
+                    <div key={item.month} className={`bar-col ${item.active ? 'bar-active' : ''}`}>
+                      {item.active && (
+                        <div className="bar-tooltip-pill">
+                          {item.label}
+                        </div>
+                      )}
+                      <div className="bar-track">
+                        <div
+                          className={`bar-fill ${item.active ? 'bar-fill-gradient' : ''}`}
+                          style={{ height: `${(item.value / 45) * 100}%` }}
+                        />
+                      </div>
+                      <span className="bar-label">{item.month}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 3: Financial Health Glowing Cyan Card */}
+            <div className="fundflow-health-card">
+              <div className="health-card-head">
+                <span className="health-card-title">Financial health</span>
+                <button
+                  className="health-expand-btn"
+                  onClick={() => navigate('/leaderboard')}
+                  title="View Model Leaderboard & Health"
+                >
+                  <RotateCcw size={14} strokeWidth={2.4} />
+                </button>
+              </div>
+
+              <div className="health-stat-block">
+                <div className="health-stat-value">85%</div>
+                <span className="health-stat-sub">since last month</span>
+              </div>
+
+              <div className="health-sparkline-wrap">
+                <ResponsiveContainer width="100%" height={68}>
+                  <AreaChart data={HEALTH_SPARKLINE} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ffffff" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <Area
+                      type="monotone"
+                      dataKey="val"
+                      stroke="#ffffff"
+                      strokeWidth={2.5}
+                      fill="url(#healthGrad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="health-axis-labels">
+                  <span>7.26k</span>
+                  <div className="sparkline-active-dot" />
+                  <span>10.75k</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="quick-actions">
-            <button className="qa qa-active" onClick={() => openTrade('buy')}>
-              <ArrowLeftRight size={16} />
-              <span>Trade</span>
-            </button>
-            <button className="qa" onClick={() => navigate('/chat')}>
-              <div className="qa-circle"><Zap size={16} /></div>
-              <span>Ask AI</span>
-            </button>
-            <button
-              className="qa"
-              onClick={() => document.getElementById('watchlist-card')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <div className="qa-circle"><StarIcon size={16} /></div>
-              <span>Watchlist</span>
-            </button>
-            <button className="qa" onClick={() => navigate('/dashboard')}>
-              <div className="qa-circle"><RouteIcon size={16} /></div>
-              <span>Predict</span>
-            </button>
-          </div>
-
-          <div className="card">
+          {/* CARD 4: Upcoming Payments / Active Watchlist */}
+          <div className="card fundflow-upcoming-card">
             <div className="card-head">
-              <h3 className="card-title">Recent Trades</h3>
-              <a className="card-link" href="/portfolio" onClick={(e) => { e.preventDefault(); navigate('/portfolio'); }}>
-                View all <ArrowUpRight size={13} />
-              </a>
+              <span className="card-title">Upcoming payments</span>
+              <button
+                className="btn btn-pill-viewall"
+                onClick={() => navigate('/portfolio')}
+              >
+                View All
+              </button>
             </div>
-            {recentTrades.length ? (
-              <table className="sales-table">
-                <thead>
-                  <tr>
-                    <th>Ticker</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentTrades.map((t, i) => (
-                    <tr key={i}>
-                      <td>
-                        <div className="sales-name">
-                          <div className="ticker-chip">{t.ticker.slice(0, 2)}</div>
-                          <div>
-                            <div className="sales-name-main">{t.ticker}</div>
-                            <div className="sales-name-sub">{t.shares} sh · {t.action}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="mono">{new Date(t.executed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                      <td>
-                        <span className={`badge ${t.triggered_by_prediction ? 'badge-pending' : 'badge-gain'}`}>
-                          {t.triggered_by_prediction ? 'Automated' : 'Success'}
-                        </span>
-                      </td>
-                      <td className={`mono ${t.action === 'buy' ? 'loss' : 'gain'}`} style={{ textAlign: 'right' }}>
-                        {t.action === 'buy' ? '-' : '+'}{formatMoney(t.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="empty-state">No trades yet — use the Trade button above to place one.</p>
-            )}
+
+            <div className="fundflow-payments-list">
+              {DEFAULT_UPCOMING.map((item, idx) => (
+                <div key={item.id} className="payment-row">
+                  <div className="payment-left">
+                    <div className="payment-logo-tile" style={{ background: item.logoBg }}>
+                      {item.symbol}
+                    </div>
+                    <div className="payment-info">
+                      <span className="payment-name">{item.name}</span>
+                      <span className="payment-category">{item.category}</span>
+                    </div>
+                  </div>
+
+                  <div className="payment-center">
+                    <span className={item.isToday ? 'badge-pending' : 'badge-done'}>
+                      {item.dateBadge}
+                    </span>
+                  </div>
+
+                  <div className="payment-right">
+                    <span className="payment-amount">${item.amount.toLocaleString('en-US', { minimumFractionDigits: 0 })}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="home-col-side">
-          <div className="card">
-            <div className="card-head">
-              <h3 className="card-title">Statistic</h3>
-              <select value={statRange} onChange={(e) => setStatRange(e.target.value)} className="range-select">
-                <option value="week">This week</option>
-                <option value="month">This month</option>
-                <option value="all">All time</option>
-              </select>
-            </div>
+        {/* RIGHT COLUMN: Transactions Panel + Tip Banner + Quick Transfer */}
+        <div className="fundflow-right-column">
 
-            <div className="stat-donut-wrap">
-              <ResponsiveContainer width={150} height={150}>
-                <PieChart>
-                  <Pie
-                    data={donutData}
-                    dataKey="value"
-                    innerRadius={52}
-                    outerRadius={72}
-                    startAngle={90}
-                    endAngle={-270}
-                    stroke="none"
-                  >
-                    {statTotal > 0 ? (
-                      donutData.map((d) => (
-                        <Cell key={d.name} fill={d.name === 'Buys' ? 'var(--color-accent)' : 'var(--color-ink)'} />
-                      ))
-                    ) : (
-                      <Cell fill="var(--color-border)" />
-                    )}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="stat-donut-center">
-                <span className="stat-donut-label">Total</span>
-                <span className="stat-donut-value mono">{formatMoney(statTotal, { maximumFractionDigits: 0 })}</span>
-              </div>
-            </div>
-
-            <div className="stat-legend">
-              <span><i style={{ background: 'var(--color-accent)' }} /> Buys ({formatMoney(buysTotal, { maximumFractionDigits: 0 })})</span>
-              <span><i style={{ background: 'var(--color-ink)' }} /> Sells ({formatMoney(sellsTotal, { maximumFractionDigits: 0 })})</span>
-            </div>
-
-            <div className="stat-tx-list">
-              {rangeTx.slice(0, 5).map((t, i) => (
-                <div className="stat-tx-row" key={i}>
-                  <div className="ticker-chip">{t.ticker.slice(0, 2)}</div>
-                  <div className="stat-tx-info">
-                    <span className="stat-tx-ticker">{t.ticker}</span>
-                    <span className="stat-tx-meta">{t.action === 'buy' ? 'Trade on the app' : 'Money in'} · {timeAgo(t.executed_at)}</span>
+          {/* SECTION: Transactions List */}
+          <div className="fundflow-transactions-panel">
+            <div className="transactions-list">
+              {displayTransactions.map((tx, idx) => (
+                <div key={idx} className="tx-item-row">
+                  <div className="tx-left">
+                    <div className="tx-bullet" />
+                    <div className="tx-details">
+                      <span className="tx-name">{tx.name}</span>
+                      <span className="tx-date">{tx.date}</span>
+                    </div>
                   </div>
-                  <span className={`mono stat-tx-amount ${t.action === 'buy' ? 'loss' : 'gain'}`}>
-                    {t.action === 'buy' ? '-' : '+'}{formatMoney(t.amount, { maximumFractionDigits: 0 })}
-                  </span>
+
+                  <div className="tx-center">
+                    <span className={tx.status === 'Pending' ? 'badge-pending' : 'badge-done'}>
+                      {tx.status}
+                    </span>
+                  </div>
+
+                  <div className="tx-right">
+                    <span className={`tx-amount ${tx.amount < 0 ? 'tx-loss' : 'tx-gain'}`}>
+                      {tx.amount < 0 ? '-' : '+'}${Math.abs(tx.amount).toFixed(0)}
+                    </span>
+                  </div>
                 </div>
               ))}
-              {!rangeTx.length && <p className="empty-state">No activity in this range.</p>}
             </div>
           </div>
 
-          <div className="card watch-card" id="watchlist-card">
-            <form onSubmit={handleAddWatch}>
-              <div className="card-head">
-                <h3 className="card-title">Watchlist</h3>
-                <Star size={15} color="var(--color-accent)" fill="var(--color-accent)" />
+          {/* SECTION: Tip Banner */}
+          <div className="fundflow-tip-banner">
+            <h4 className="tip-banner-title">How to reduce expenses by 25%?</h4>
+            <p className="tip-banner-sub">View these useful tips to save your money.</p>
+            <button
+              className="tip-banner-link"
+              onClick={() => setTipsModalOpen(true)}
+            >
+              Learn more <ArrowRight size={13} />
+            </button>
+          </div>
+
+          {/* CARD: Quick Transfer */}
+          <div className="card fundflow-quick-transfer-card">
+            <div className="card-head">
+              <span className="card-title">Quick transfer</span>
+              <div className="quick-transfer-links">
+                <button className="qt-link active">All</button>
+                <button className="qt-link" onClick={() => navigate('/portfolio')}>Contacts</button>
               </div>
-              <p className="page-sub" style={{ margin: '0 0 10px' }}>
-                {watchlist.length ? `${watchlist.length} ticker${watchlist.length === 1 ? '' : 's'} tracked` : 'Track a ticker for quick signals'}
-              </p>
-              <div className="watch-input-row">
+            </div>
+
+            {/* Avatars Row */}
+            <div className="quick-transfer-avatars-row">
+              <button
+                className="add-new-avatar-btn"
+                onClick={() => setTradeOpen(true)}
+                title="Add new contact / trade"
+              >
+                <div className="dashed-plus-circle">
+                  <Plus size={16} />
+                </div>
+                <span>Add new</span>
+              </button>
+
+              {CONTACTS.map((c, i) => (
+                <div
+                  key={c.name}
+                  className={`contact-avatar-col ${selectedContact === i ? 'selected' : ''}`}
+                  onClick={() => setSelectedContact(i)}
+                >
+                  <img src={c.avatar} alt={c.name} className="contact-avatar-img" />
+                  <span className="contact-name">{c.name}</span>
+                </div>
+              ))}
+
+              <button
+                className="qt-chevron-btn"
+                onClick={() => setSelectedContact((prev) => (prev + 1) % CONTACTS.length)}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            {/* Amount Input & Send Button */}
+            <form className="quick-transfer-action-row" onSubmit={handleQuickTransfer}>
+              <div className="qt-amount-input-wrap">
+                <span className="qt-dollar-sign">$</span>
                 <input
-                  className="mono"
-                  placeholder="Ticker"
-                  value={watchInput}
-                  onChange={(e) => setWatchInput(e.target.value.toUpperCase())}
-                  maxLength={6}
+                  type="text"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value)}
+                  className="qt-amount-input"
                 />
-                <button className="btn btn-primary" disabled={watchBusy} type="submit">Add</button>
               </div>
-              {watchError && <p className="form-error">{watchError}</p>}
+              <button type="submit" className="btn btn-black qt-send-btn">
+                {transferDone ? 'Sent ✓' : 'Send'}
+              </button>
             </form>
-            {watchlist.length > 0 && (
-              <div className="watch-chip-row">
-                {watchlist.map((w) => (
-                  <button key={w.ticker} className="pill" onClick={() => navigate(`/dashboard?ticker=${w.ticker}`)}>
-                    {w.ticker}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-
-          {sparkline.length > 1 && (
-            <div className="card">
-              <div className="card-head">
-                <h3 className="card-title">Portfolio trend</h3>
-              </div>
-              <ResponsiveContainer width="100%" height={70}>
-                <LineChart data={sparkline}>
-                  <Line type="monotone" dataKey="value" stroke="var(--color-accent)" dot={false} strokeWidth={2.5} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
         </div>
       </div>
 
+      {/* QUICK TRADE MODAL */}
       {tradeOpen && (
         <div className="modal-overlay" onClick={() => setTradeOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="card-head">
-              <h3 className="card-title">Quick trade</h3>
-              <button className="modal-close" onClick={() => setTradeOpen(false)}><X size={16} /></button>
+              <h3 className="card-title">Place Order</h3>
+              <button className="modal-close" onClick={() => setTradeOpen(false)}>
+                <X size={16} />
+              </button>
             </div>
-            <div className="pill-row" style={{ marginBottom: 14 }}>
-              <button className={`pill${tradeAction === 'buy' ? ' pill-active' : ''}`} onClick={() => setTradeAction('buy')}>Buy</button>
-              <button className={`pill${tradeAction === 'sell' ? ' pill-active' : ''}`} onClick={() => setTradeAction('sell')}>Sell</button>
+
+            <div className="pill-row" style={{ marginBottom: 16 }}>
+              <button
+                type="button"
+                className={`pill ${tradeAction === 'buy' ? 'pill-active' : ''}`}
+                onClick={() => setTradeAction('buy')}
+              >
+                Buy
+              </button>
+              <button
+                type="button"
+                className={`pill ${tradeAction === 'sell' ? 'pill-active' : ''}`}
+                onClick={() => setTradeAction('sell')}
+              >
+                Sell
+              </button>
             </div>
+
             <form onSubmit={submitTrade}>
-              <div className="trade-row">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                    Ticker
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. AAPL"
+                    value={tradeTicker}
+                    onChange={(e) => setTradeTicker(e.target.value.toUpperCase())}
+                    style={{ width: '100%' }}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                    Shares
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.01"
+                    placeholder="Shares"
+                    value={tradeShares}
+                    onChange={(e) => setTradeShares(e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {tradeError && <p className="form-error">{tradeError}</p>}
+              {tradeSuccess && <p className="gain" style={{ fontSize: 13, marginTop: 8 }}>{tradeSuccess}</p>}
+
+              <button
+                type="submit"
+                className="btn btn-black"
+                style={{ width: '100%', marginTop: 20 }}
+                disabled={tradeBusy}
+              >
+                {tradeBusy ? 'Executing…' : `${tradeAction === 'buy' ? 'Buy' : 'Sell'} ${tradeTicker}`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* RECEIVE / DEPOSIT MODAL */}
+      {depositOpen && (
+        <div className="modal-overlay" onClick={() => setDepositOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="card-head">
+              <h3 className="card-title">Deposit Virtual Cash</h3>
+              <button className="modal-close" onClick={() => setDepositOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '0 0 16px' }}>
+              Add simulated funds to your paper trading ledger balance.
+            </p>
+            <form onSubmit={submitDeposit}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                  Deposit Amount ($)
+                </label>
                 <input
-                  className="mono"
-                  placeholder="Ticker"
-                  value={tradeTicker}
-                  onChange={(e) => setTradeTicker(e.target.value.toUpperCase())}
-                  maxLength={6}
+                  type="number"
+                  step="100"
+                  min="1"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  style={{ width: '100%', fontSize: 18, fontWeight: 700 }}
                   autoFocus
                 />
-                <input
-                  className="mono"
-                  type="number"
-                  placeholder="Shares"
-                  value={tradeShares}
-                  onChange={(e) => setTradeShares(e.target.value)}
-                  min="0"
-                  step="any"
-                />
               </div>
-              <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} disabled={tradeBusy} type="submit">
-                {tradeBusy ? 'Working…' : tradeAction === 'buy' ? 'Buy shares' : 'Sell shares'}
+
+              {depositSuccess && <p className="gain" style={{ fontSize: 13, marginBottom: 12 }}>{depositSuccess}</p>}
+
+              <button
+                type="submit"
+                className="btn btn-black"
+                style={{ width: '100%' }}
+                disabled={depositBusy}
+              >
+                {depositBusy ? 'Processing…' : 'Deposit Funds'}
               </button>
-              {tradeError && <p className="form-error">{tradeError}</p>}
-              {tradeDone && <p className="page-sub" style={{ marginTop: 8 }}>{tradeDone}</p>}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* TIPS MODAL */}
+      {tipsModalOpen && (
+        <div className="modal-overlay" onClick={() => setTipsModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="card-head">
+              <h3 className="card-title">Quantitative Trading & Research Tips</h3>
+              <button className="modal-close" onClick={() => setTipsModalOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 10 }}>
+              <div style={{ padding: 12, background: 'var(--color-surface-sunken)', borderRadius: 12 }}>
+                <strong style={{ fontSize: 13, display: 'block', color: 'var(--color-ink)' }}>1. High Confidence Filtering</strong>
+                <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                  Only execute trades when model confidence is $\ge 65\%$. Test this in the Strategy Sandbox!
+                </span>
+              </div>
+              <div style={{ padding: 12, background: 'var(--color-surface-sunken)', borderRadius: 12 }}>
+                <strong style={{ fontSize: 13, display: 'block', color: 'var(--color-ink)' }}>2. Cross-check SEC Risk Factors</strong>
+                <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                  Use the Filings RAG Assistant to verify supply chain and debt risks before buying.
+                </span>
+              </div>
+              <div style={{ padding: 12, background: 'var(--color-surface-sunken)', borderRadius: 12 }}>
+                <strong style={{ fontSize: 13, display: 'block', color: 'var(--color-ink)' }}>3. FinBERT Sentiment Confirmation</strong>
+                <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                  Confirm technical LSTM buy signals with positive news sentiment polarity on the Company Dashboard.
+                </span>
+              </div>
+            </div>
+            <button
+              className="btn btn-black"
+              style={{ width: '100%', marginTop: 20 }}
+              onClick={() => setTipsModalOpen(false)}
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}

@@ -2,15 +2,16 @@ import argparse
 import sys
 from datetime import date, datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+
 import psycopg2
 import requests
 from bs4 import BeautifulSoup
 import embeddings
 from chunk_and_embed import (DB_URL, chunk_text, embed_chunks, ensure_company_exists, ensure_embedding_width, insert_chunks, insert_filing)
 from clean_filing import strip_html
-
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 SEARCH_URL = "https://www.fool.com/search/?q={query}"
 QUARTER_END_MONTH = {"Q1":3, "Q2":6, "Q3":9, "Q4":12}
 HEADERS = {"User-Agent":(

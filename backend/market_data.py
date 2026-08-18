@@ -86,7 +86,7 @@ def latest_close_from_db(conn, ticker: str) -> tuple[float, str] | None:
         cur.execute(
             "SELECT close, date FROM price_history "
             "WHERE ticker = %s AND close IS NOT NULL ORDER BY date DESC LIMIT 1",
-            (ticker))
+            (ticker,))
         row = cur.fetchone()
     finally:
         cur.close()

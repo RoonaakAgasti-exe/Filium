@@ -12,7 +12,7 @@ def get_news(ticker:str, limit:int = Query(default = 30, ge = 1, le = 200), conn
         cur.execute(
             "SELECT published_date, headline, summary, url, source, sentiment_score "
             "FROM news_articles WHERE ticker = %s "
-            "ORDER BY published_date DESC, id DESC LIMIT %s", ticker, limit)
+            "ORDER BY published_date DESC, id DESC LIMIT %s", (ticker, limit))
         rows = cur.fetchall()
     finally:
         cur.close()
@@ -47,7 +47,7 @@ def sentiment_timeline(ticker:str, days:int = Query(default = 180, ge = 1, le = 
                 WHERE ticker = %s AND source = 'news' ORDER BY date DESC LIMIT %s
             ) s ON s.date = p.date
             ORDER BY 1
-            """, ticker, days, ticker, days)
+            """, (ticker, days, ticker, days))
         rows = cur.fetchall()
     finally:
         cur.close()

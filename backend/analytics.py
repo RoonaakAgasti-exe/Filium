@@ -143,11 +143,11 @@ def portfolio_analytics(conn, user_id: int, holdings: list[dict]) -> dict:
     cur = conn.cursor()
     try:
         cur.execute(
-            "SELECT date, total_value FROM portfolio_snapshots WHERE user_id = %s ORDER BY date", (user_id))
+            "SELECT date, total_value FROM portfolio_snapshots WHERE user_id = %s ORDER BY date", (user_id,))
         snapshots = [(row[0], float(row[1])) for row in cur.fetchall()]
         cur.execute(
             "SELECT realized_pl FROM transactions "
-            "WHERE user_id = %s AND action = 'sell' AND realized_pl IS NOT NULL", (user_id))
+            "WHERE user_id = %s AND action = 'sell' AND realized_pl IS NOT NULL", (user_id,))
         sells = [{"realized_pl": row[0]} for row in cur.fetchall()]
     finally:
         cur.close()

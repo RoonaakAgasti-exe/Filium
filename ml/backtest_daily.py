@@ -13,7 +13,7 @@ def get_unresolved_predictions(conn, as_of:date) -> list[dict]:
         SELECT id, ticker, prediction_date, target_date
         FROM predictions
         WHERE target_date <= %s AND actual_direction IS NULL
-        """, as_of)
+        """, (as_of,))
     columns = ["id", "ticker", "prediction_date", "target_date"]
     rows = cur.fetchall()
     cur.close()

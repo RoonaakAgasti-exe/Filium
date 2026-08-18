@@ -48,7 +48,7 @@ def fetch_news_items(conn, ticker:str, rescore:bool) -> list[dict]:
     try:
         cur.execute(
             f"SELECT id, published_date, headline, summary FROM news_articles {where} "
-            f"ORDER BY published_date DESC, id DESC", ticker)
+            f"ORDER BY published_date DESC, id DESC", (ticker,))
         rows = cur.fetchall()
     finally:
         cur.close()
@@ -68,7 +68,7 @@ def fetch_filing_items(conn, ticker:str) -> list[dict]:
             JOIN filings f ON f.id = fc.filing_id
             WHERE f.ticker = %s
             ORDER BY f.filing_date DESC, fc.chunk_index
-            """, ticker)
+            """, (ticker,))
         rows = cur.fetchall()
     finally:
         cur.close()
@@ -87,7 +87,7 @@ def existing_news_scores(conn, ticker:str) -> dict:
     try:
         cur.execute(
             "SELECT published_date, headline, sentiment_score FROM news_articles "
-            "WHERE ticker = %s AND sentiment_score IS NOT NULL", ticker)
+            "WHERE ticker = %s AND sentiment_score IS NOT NULL", (ticker,))
         rows = cur.fetchall()
     finally:
         cur.close()

@@ -32,7 +32,7 @@ def gather_context(conn, ticker: str) -> dict:
             WHERE p.ticker = %s
             ORDER BY p.prediction_date DESC, p.id DESC LIMIT 1
             """,
-            (ticker)
+            (ticker,)
         )
         row = cur.fetchone()
         if row:
@@ -44,7 +44,7 @@ def gather_context(conn, ticker: str) -> dict:
             "SELECT date, score, article_count FROM sentiment_scores "
             "WHERE ticker = %s AND source = 'news' AND score IS NOT NULL "
             "ORDER BY date DESC LIMIT 1",
-            (ticker)
+            (ticker,)
         )
         row = cur.fetchone()
         if row:
@@ -54,7 +54,7 @@ def gather_context(conn, ticker: str) -> dict:
         cur.execute(
             "SELECT date, close FROM price_history WHERE ticker = %s AND close IS NOT NULL "
             "ORDER BY date DESC LIMIT 1",
-            (ticker)
+            (ticker,)
         )
         row = cur.fetchone()
         if row:

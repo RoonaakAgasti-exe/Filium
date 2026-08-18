@@ -181,7 +181,7 @@ def store_articles(conn, ticker: str, articles: list[dict]) -> int:
     return after - before
 
 def _count(cur, ticker: str) -> int:
-    cur.execute("SELECT count(*) FROM news_articles WHERE ticker = %s", (ticker))
+    cur.execute("SELECT count(*) FROM news_articles WHERE ticker = %s", (ticker,))
     return cur.fetchone()[0]
 
 def watchlisted_tickers(conn) -> list[str]:

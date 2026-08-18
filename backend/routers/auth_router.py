@@ -29,7 +29,7 @@ def me(user_id:int = Depends(get_current_user_id), conn:PgConnection = Depends(g
     try:
         cur.execute(
             "SELECT u.id, u.email, u.created_at, w.cash_balance "
-            "FROM users u LEFT JOIN wallets w ON w.user_id = u.id WHERE u.id = %s", user_id)
+            "FROM users u LEFT JOIN wallets w ON w.user_id = u.id WHERE u.id = %s", (user_id,))
         row = cur.fetchone()
     finally:
         cur.close()

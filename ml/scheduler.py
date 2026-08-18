@@ -4,6 +4,11 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "ingestion"))
+sys.path.append(str(Path(__file__).parent.parent / "backend"))
+
 import psycopg2
 from apscheduler.schedulers.blocking import BlockingScheduler
 from dotenv import load_dotenv
@@ -13,10 +18,6 @@ from backtest_daily import run_backtest
 from predict_daily import run_daily_predictions
 import company_info
 import wallet
-
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "ingestion"))
-sys.path.append(str(Path(__file__).parent.parent / "backend"))
 load_dotenv()
 logging.basicConfig(level = logging.INFO, format = "%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("filium.scheduler")

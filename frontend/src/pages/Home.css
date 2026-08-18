@@ -1,369 +1,733 @@
-/* Home.css — Home.css module. */
-.home-grid {
+/* Home.css — FundFlow Finance Dashboard Component Styling */
+
+.fundflow-dashboard-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: var(--space-3);
+  grid-template-columns: 1.55fr 1fr;
+  gap: 28px;
   align-items: start;
+  width: 100%;
 }
 
-.home-col-main, .home-col-side {
+.fundflow-center-column {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 24px;
+  min-width: 0;
 }
 
-.section-head {
+.fundflow-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   1. TOTAL BALANCE CARD
+   ========================================================================== */
+.fundflow-balance-card {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 32px 36px 36px;
+  box-shadow: 0 10px 30px rgba(20, 25, 50, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.fundflow-balance-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-1);
 }
 
-.cards-row {
+.fundflow-balance-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #8a8fa3;
+}
+
+.fundflow-currency-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  border: 1px solid var(--color-border-soft);
+}
+
+.fundflow-currency-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  color: #8a8fa3;
+}
+
+.fundflow-currency-btn.active {
+  background: #14141f;
+  color: #ffffff;
+}
+
+.fundflow-balance-figure {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 800;
+  color: #1a1b2e;
+  letter-spacing: -0.03em;
+  margin: 12px 0 28px;
+}
+
+/* 3 Overlapping Account Bubbles / Circles */
+.fundflow-bubbles-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 32px;
+  position: relative;
+  padding: 10px 0;
+}
+
+.fundflow-bubble {
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fundflow-bubble-side {
+  width: 125px;
+  height: 125px;
+  background: #ffffff;
+  border: 1px solid #e2e6f4;
+  box-shadow: 0 6px 18px rgba(20, 25, 50, 0.05);
+  z-index: 1;
+}
+
+.fundflow-bubble-side .bubble-amount {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1b2e;
+}
+
+.fundflow-bubble-side .bubble-brand {
+  font-size: 11px;
+  color: #8a8fa3;
+  margin-top: 2px;
+}
+
+.fundflow-bubble-left {
+  margin-right: -24px;
+}
+
+.fundflow-bubble-right {
+  margin-left: -24px;
+}
+
+/* Center raised Mastercard bubble */
+.fundflow-bubble-center {
+  width: 154px;
+  height: 154px;
+  background: linear-gradient(135deg, #6d5cfc 0%, #8b7cfc 100%);
+  color: #ffffff;
+  box-shadow: 0 16px 36px rgba(109, 92, 252, 0.42), 0 4px 12px rgba(109, 92, 252, 0.25);
+  z-index: 2;
+  transform: translateY(-4px);
+}
+
+.fundflow-bubble-center .bubble-amount {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.fundflow-bubble-center .bubble-brand {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+}
+
+.fundflow-bubble-center:hover {
+  transform: translateY(-8px) scale(1.03);
+}
+
+.fundflow-balance-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+  gap: 16px;
+  margin-top: auto;
 }
 
-@media (max-width: 640px) {
-  .cards-row {
+.fundflow-btn-pill {
+  padding: 13px 24px;
+  font-size: 14px;
+  border-radius: var(--radius-pill);
+}
+
+/* ==========================================================================
+   2. EXPENSE STATISTIC & FINANCIAL HEALTH ROW
+   ========================================================================== */
+.fundflow-stats-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 24px;
+}
+
+.fundflow-expense-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.fundflow-dropdown-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px 4px 14px;
+  border: 1px solid var(--color-border-soft);
+}
+
+.fundflow-select-raw {
+  appearance: none;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a8fa3;
+  cursor: pointer;
+  padding-right: 14px;
+}
+
+.fundflow-select-raw:focus {
+  box-shadow: none;
+}
+
+.dropdown-arrow {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: #8a8fa3;
+}
+
+.fundflow-barchart-container {
+  padding-top: 24px;
+}
+
+.custom-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 140px;
+  padding: 0 8px;
+}
+
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  height: 100%;
+  justify-content: flex-end;
+  position: relative;
+}
+
+.bar-track {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.bar-fill {
+  width: 100%;
+  background: #e6ebf8;
+  border-radius: 12px 12px 6px 6px;
+  transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bar-fill-gradient {
+  background: linear-gradient(180deg, #6d5cfc 0%, #8b7cfc 100%);
+  box-shadow: 0 6px 14px rgba(109, 92, 252, 0.3);
+}
+
+.bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a8fa3;
+  letter-spacing: 0.05em;
+}
+
+.bar-tooltip-pill {
+  position: absolute;
+  top: 0;
+  background: #14141f;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 10px rgba(20, 20, 31, 0.2);
+  animation: scaleUp 0.2s ease-out;
+}
+
+/* Financial Health Cyan Card */
+.fundflow-health-card {
+  background: linear-gradient(135deg, #4fd1e8 0%, #6de2f0 100%);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 24px rgba(79, 209, 232, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.health-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.health-card-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.health-expand-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-expand-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.health-stat-block {
+  margin: 8px 0 2px;
+}
+
+.health-stat-value {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.health-stat-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+  display: block;
+}
+
+.health-sparkline-wrap {
+  position: relative;
+  margin-top: 6px;
+}
+
+.health-axis-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  margin-top: -6px;
+}
+
+.sparkline-active-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35);
+}
+
+/* ==========================================================================
+   3. UPCOMING PAYMENTS CARD
+   ========================================================================== */
+.fundflow-upcoming-card {
+  padding: 24px 28px;
+}
+
+.fundflow-payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.payment-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.payment-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 180px;
+}
+
+.payment-logo-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.payment-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.payment-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #1a1b2e;
+}
+
+.payment-category {
+  font-size: 12px;
+  color: #8a8fa3;
+}
+
+.payment-center {
+  display: flex;
+  align-items: center;
+}
+
+.payment-right {
+  text-align: right;
+}
+
+.payment-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: #1a1b2e;
+}
+
+/* ==========================================================================
+   4. TRANSACTIONS PANEL (RIGHT COLUMN)
+   ========================================================================== */
+.fundflow-transactions-panel {
+  background: transparent;
+  padding: 4px 0;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tx-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(226, 230, 244, 0.8);
+}
+
+.tx-item-row:last-child {
+  border-bottom: none;
+}
+
+.tx-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 140px;
+}
+
+.tx-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd3ea;
+}
+
+.tx-details {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tx-name {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a1b2e;
+}
+
+.tx-date {
+  font-size: 11.5px;
+  color: #8a8fa3;
+}
+
+.tx-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.tx-loss {
+  color: #1a1b2e;
+}
+
+.tx-gain {
+  color: #10b981;
+}
+
+/* Tip Banner Block */
+.fundflow-tip-banner {
+  padding: 18px 22px;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(226, 230, 244, 0.7);
+  box-shadow: 0 4px 16px rgba(20, 25, 50, 0.03);
+}
+
+.tip-banner-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1b2e;
+  margin: 0 0 4px;
+}
+
+.tip-banner-sub {
+  font-size: 12.5px;
+  color: #8a8fa3;
+  margin: 0 0 10px;
+}
+
+.tip-banner-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6d5cfc;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.tip-banner-link:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   5. QUICK TRANSFER CARD
+   ========================================================================== */
+.fundflow-quick-transfer-card {
+  padding: 24px 28px;
+}
+
+.quick-transfer-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qt-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #8a8fa3;
+  padding: 0;
+}
+
+.qt-link.active {
+  color: #1a1b2e;
+}
+
+.quick-transfer-avatars-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0 22px;
+}
+
+.add-new-avatar-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+}
+
+.dashed-plus-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1.5px dashed #8a8fa3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a8fa3;
+  transition: all 0.15s ease;
+}
+
+.add-new-avatar-btn:hover .dashed-plus-circle {
+  border-color: #6d5cfc;
+  color: #6d5cfc;
+  transform: scale(1.05);
+}
+
+.add-new-avatar-btn span {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8a8fa3;
+}
+
+.contact-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.contact-avatar-col:hover, .contact-avatar-col.selected {
+  transform: translateY(-2px);
+}
+
+.contact-avatar-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border: 2px solid transparent;
+}
+
+.contact-avatar-col.selected .contact-avatar-img {
+  border-color: #6d5cfc;
+}
+
+.contact-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1a1b2e;
+}
+
+.qt-chevron-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  color: #8a8fa3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.qt-chevron-btn:hover {
+  background: var(--color-border);
+  color: #1a1b2e;
+}
+
+.quick-transfer-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 6px 8px 6px 20px;
+  border: 1px solid var(--color-border-soft);
+}
+
+.qt-amount-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.qt-dollar-sign {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a1b2e;
+}
+
+.qt-amount-input {
+  border: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a1b2e;
+  padding: 0;
+  width: 100%;
+}
+
+.qt-amount-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.qt-send-btn {
+  padding: 10px 24px;
+  font-size: 13.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .fundflow-dashboard-grid {
     grid-template-columns: 1fr;
   }
 }
 
-.paper-card {
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 148px;
-  box-shadow: var(--shadow-card);
-}
-
-.paper-card-dark {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(75, 111, 255, 0.35), transparent 55%),
-    linear-gradient(155deg, #1d1e25 0%, #14151a 100%);
-}
-
-.paper-card-teal {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.15), transparent 55%),
-    linear-gradient(155deg, #17a884 0%, #0f6e5a 60%, #0a4a3c 100%);
-}
-
-.paper-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.paper-card-balance {
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.paper-card-dots {
-  background: rgba(255, 255, 255, 0.14);
-  border: none;
-  color: #fff;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.paper-card-mask {
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.75);
-  margin: var(--space-3) 0;
-}
-
-.paper-card-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
-  letter-spacing: 0.06em;
-}
-
-.paper-card-brand {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: #fff;
-}
-
-.switch-on-card {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.switch-on-card.switch-on {
-  background: #ffffff;
-}
-
-.switch-on-card.switch-on .switch-knob {
-  background: var(--color-secondary-dim);
-}
-
-.quick-actions {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-
-.qa {
-  background: none;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.qa-circle {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--color-ink);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.qa-active {
-  flex-direction: row;
-  background: var(--color-accent);
-  color: #fff;
-  border-radius: var(--radius-pill);
-  padding: 13px 22px;
-  gap: 8px;
-  font-size: 13.5px;
-  box-shadow: var(--shadow-card);
-}
-
-.sales-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.sales-table th {
-  text-align: left;
-  color: var(--color-text-faint);
-  font-weight: 600;
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border-soft);
-}
-
-.sales-table td {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border-soft);
-  vertical-align: middle;
-}
-
-.sales-table tr:last-child td {
-  border-bottom: none;
-}
-
-.sales-name {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sales-name-main {
-  font-weight: 700;
-  font-size: 13.5px;
-}
-
-.sales-name-sub {
-  font-size: 11.5px;
-  color: var(--color-text-faint);
-  text-transform: capitalize;
-}
-
-.range-select {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-pill);
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.stat-donut-wrap {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  margin: var(--space-2) 0;
-}
-
-.stat-donut-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.stat-donut-label {
-  font-size: 11px;
-  color: var(--color-text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.stat-donut-value {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 16px;
-}
-
-.stat-legend {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-4);
-  font-size: 12px;
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-3);
-}
-
-.stat-legend span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.stat-legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.stat-tx-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border-soft);
-}
-
-.stat-tx-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.stat-tx-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.stat-tx-ticker {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.stat-tx-meta {
-  font-size: 11px;
-  color: var(--color-text-faint);
-}
-
-.stat-tx-amount {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.watch-input-row {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.watch-input-row input {
-  flex: 1;
-  min-width: 0;
-  text-transform: uppercase;
-}
-
-.watch-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: var(--space-3);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 21, 30, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: var(--space-3);
-}
-
-.modal-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  width: 100%;
-  max-width: 360px;
-  box-shadow: 0 24px 60px -20px rgba(20, 21, 30, 0.4);
-}
-
-.modal-close {
-  background: var(--color-surface-sunken);
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-}
-
-.trade-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-}
-
-.trade-row input {
-  width: 100%;
-}
-
-@media (max-width: 900px) {
-  .home-grid {
+@media (max-width: 640px) {
+  .fundflow-stats-row {
     grid-template-columns: 1fr;
+  }
+  .fundflow-bubbles-wrapper {
+    transform: scale(0.85);
   }
 }

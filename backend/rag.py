@@ -252,7 +252,7 @@ def list_filings(conn, ticker: str) -> list[dict]:
             GROUP BY f.id
             ORDER BY f.filing_date DESC
             """,
-            (ticker.upper())
+            (ticker.upper(),)
         )
         columns = [d[0] for d in cur.description]
         rows = [dict(zip(columns, row)) for row in cur.fetchall()]

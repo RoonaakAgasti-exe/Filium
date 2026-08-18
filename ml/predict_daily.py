@@ -58,7 +58,7 @@ def load_recent_prices(conn, ticker:str, rows:int = HISTORY_ROWS, as_of:date | N
     try:
         sql = ("SELECT date, open, high, low, close, volume FROM price_history "
                "WHERE ticker = %s AND close IS NOT NULL")
-        params: list = [ticker]
+        params: list = [ticker.upper()]
         if as_of is not None:
             sql += " AND date <= %s"
             params.append(as_of)
@@ -82,7 +82,7 @@ def load_sentiment(conn, ticker:str, source:str = "news", as_of:date | None = No
     try:
         sql = ("SELECT date, score FROM sentiment_scores "
                "WHERE ticker = %s AND source = %s")
-        params: list = [ticker, source]
+        params: list = [ticker.upper(), source]
         if as_of is not None:
             sql += " AND date <= %s"
             params.append(as_of)

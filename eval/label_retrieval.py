@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import psycopg2
 from dotenv import load_dotenv
+from openai import OpenAI
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ingestion"))
 from answer_query import embed_query, retrieve_chunks, DB_URL, TOP_K_RETRIEVE
